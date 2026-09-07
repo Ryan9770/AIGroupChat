@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
  *
  * 왜 심이 필요한가: 개발 중에는 `tsx src/index.ts`로, 빌드 후에는 `node dist/index.js`로
  * 돌아간다. 프리앰블에 명령 문자열을 박으면 셸마다 인용 규칙이 달라 조용히 깨진다.
- * 심 하나를 만들어 절대 경로로 알려주면 그 문제가 사라진다.
+ * 심 하나를 만들어 PATH에 얹으면 그 문제가 사라진다.
  *
  * worktree 밖(run 디렉토리)에 쓴다. 안에 쓰면 워커의 diff에 섞여 들어간다.
  */
@@ -17,6 +17,22 @@ const here = dirname(fileURLToPath(import.meta.url));
 const outDir = dirname(here);
 /** 패키지 루트. node_modules를 찾을 때 쓴다. */
 const packageRoot = dirname(outDir);
+
+/**
+ * 워커가 셸에서 칠 명령 이름.
+ *
+ * 절대 경로가 아니라 짧은 이름인 게 중요하다. 권한을 좁게 허용하려면
+ * `Bash(conductor *)` 같은 패턴으로 매칭해야 하는데, 공백과 백슬래시가 든
+ * 절대 경로로는 그 패턴이 안정적으로 맞지 않는다.
+ */
+export const SHIM_COMMAND = 'conductor';
+
+export interface Shim {
+  /** 프리앰블에 넣을 명령. PATH를 통해 해석된다. */
+  command: string;
+  /** 워커의 PATH 앞에 붙일 디렉토리. */
+  binDir: string;
+}
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -44,7 +60,7 @@ async function resolveEntry(): Promise<{ entry: string; needsTsx: boolean }> {
   throw new Error(`conductor 진입점을 찾을 수 없습니다: ${compiled} / ${source}`);
 }
 
-export async function writeConductorShim(binDir: string): Promise<string> {
+export async function writeConductorShim(binDir: string): Promise<Shim> {
   const { entry, needsTsx } = await resolveEntry();
 
   const argv = [process.execPath];
@@ -63,14 +79,17 @@ export async function writeConductorShim(binDir: string): Promise<string> {
   const quotedCmd = argv.map((a) => `"${a}"`).join(' ');
 
   // Windows: cmd.exe가 이걸 찾는다. %*로 인자를 그대로 넘긴다.
-  await writeFile(join(binDir, 'conductor.cmd'), `@echo off\r\n${quotedCmd} %*\r\n`, 'utf8');
+  await writeFile(join(binDir, `${SHIM_COMMAND}.cmd`), `@echo off\r\n${quotedCmd} %*\r\n`, 'utf8');
 
   // POSIX 셸(워커가 bash/sh를 쓰는 경우)용.
-  const shPath = join(binDir, 'conductor');
+  const shPath = join(binDir, SHIM_COMMAND);
   await writeFile(shPath, `#!/bin/sh\nexec ${quotedCmd} "$@"\n`, 'utf8');
   await chmod(shPath, 0o755).catch(() => undefined);
 
-  // 확장자 없는 경로를 준다. cmd.exe는 conductor.cmd를, POSIX 셸은 conductor를 찾는다.
-  // 경로에 공백이 있을 수 있으므로 인용해서 돌려준다.
-  return `"${join(binDir, 'conductor')}"`;
+  return { command: SHIM_COMMAND, binDir };
+}
+
+/** 워커의 PATH 앞에 심 디렉토리를 붙인다. */
+export function pathWithShim(binDir: string, currentPath = process.env['PATH'] ?? ''): string {
+  return `${binDir}${process.platform === 'win32' ? ';' : ':'}${currentPath}`;
 }

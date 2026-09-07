@@ -2,9 +2,9 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allAdapters } from '../adapters/registry.js';
+import { allAdapters, getAdapter } from '../adapters/registry.js';
 import { loadConfig } from '../core/config.js';
-import { executeDispatch } from '../core/dispatch.js';
+import { DispatchConfigError, executeDispatch } from '../core/dispatch.js';
 import { Governor } from '../core/governor.js';
 import { DEFAULT_ROUTES, route } from '../core/router.js';
 import { runPlan, SchedulerError } from '../core/scheduler.js';
@@ -74,6 +74,7 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
         summary: p.authSummary ?? null,
         notes: p.notes,
         availability: governor.availability(p.provider),
+        commandPermission: getAdapter(p.provider).capability.commandPermission,
       })),
       routes: DEFAULT_ROUTES,
       defaultCwd: opts.defaultCwd,
@@ -259,7 +260,9 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
         });
       } catch (err) {
         const message =
-          err instanceof WorkspaceError
+          err instanceof DispatchConfigError
+            ? `${err.message} — ${err.hint}`
+            : err instanceof WorkspaceError
             ? `${err.message}${err.hint ? ` — ${err.hint}` : ''}`
             : err instanceof Error
               ? err.message

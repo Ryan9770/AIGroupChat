@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CONFIG_FILE, loadConfig } from '../src/core/config.js';
+import { getAdapter } from '../src/adapters/registry.js';
+import { DispatchConfigError, executeDispatch } from '../src/core/dispatch.js';
 import { route } from '../src/core/router.js';
 import { runPlan } from '../src/core/scheduler.js';
 import type { DispatchRequest, DispatchResult } from '../src/core/dispatch.js';
@@ -145,5 +147,54 @@ describe('스케줄러가 담당 지정을 따른다', () => {
 
     expect(assigned).toEqual({ design: 'claude', impl: 'antigravity', review: 'claude' });
     expect(outcomes.every((o) => o.state === 'succeeded')).toBe(true);
+  });
+});
+
+describe('협약과 명령 권한', () => {
+  it('claude는 보고 명령만 콕 집어 허용한다', () => {
+    // 전면 승인 없이도 협약이 돌아가야 한다.
+    const { args } = getAdapter('claude').buildArgv({
+      prompt: 'x', mode: 'write', cwd: '.', autoApprove: false, allowCommands: ['conductor'],
+    });
+    expect(args).toContain('--allowed-tools');
+    expect(args).toContain('Bash(conductor *)');
+    // 전면 승인으로 올리지 않는다.
+    expect(args).toContain('acceptEdits');
+    expect(args).not.toContain('bypassPermissions');
+  });
+
+  it('명령을 골라 허용 못 하는 provider는 실행 전에 막는다', async () => {
+    // 실행해봐야 no_completion이 확정이다. 쿼터를 태우기 전에 막는다.
+    await expect(
+      executeDispatch({
+        provider: 'antigravity',
+        spec: 'x',
+        mode: 'write',
+        cwd: '.',
+        workspace: { kind: 'none' },
+        isolate: true,
+        autoApprove: false,
+        protocol: true,
+        answerMode: 'auto',
+        timeoutMs: 1000,
+        runDir: 'C:/tmp/run',
+        taskId: 't',
+        attempt: 1,
+      }),
+    ).rejects.toThrow(DispatchConfigError);
+  });
+
+  it('자동 승인을 켜면 막지 않는다', () => {
+    const { args } = getAdapter('antigravity').buildArgv({
+      prompt: 'x', mode: 'write', cwd: '.', autoApprove: true,
+    });
+    expect(args).toContain('--dangerously-skip-permissions');
+  });
+
+  it('provider별 명령 권한 방식이 정의돼 있다', () => {
+    // 이 값으로 "실행하면 반드시 실패하는 조합"을 판단한다.
+    expect(getAdapter('claude').capability.commandPermission).toBe('granular');
+    expect(getAdapter('antigravity').capability.commandPermission).toBe('all-or-nothing');
+    expect(getAdapter('codex').capability.commandPermission).toBe('sandbox');
   });
 });

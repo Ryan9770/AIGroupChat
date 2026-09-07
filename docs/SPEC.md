@@ -660,6 +660,52 @@ files 1개 변경  · package.json
 
 **워커가 추측하지 않고 되물었다.** 사용자가 원한 "대화" 기능이 자유 대화방 없이 성립한다.
 
+### 5.7.4a 🔴 협약은 셸 권한을 요구한다 — 사용자가 발견한 실패
+
+계획 탭 기본값(**협약 ON + 자동 승인 OFF**)으로 실행한 Task가 6분을 돌고
+`no_completion`으로 끝났다. 메시지가 **하나도** 남지 않았다.
+
+워커 자신이 원인을 말해줬다.
+
+> "I could not send the `worker done` report: **all shell commands are auto-denied in this
+> session** (no approval surface), so the `conductor` binary cannot be invoked."
+
+**협약은 워커가 셸 명령으로 보고하게 만든다.** 그런데 claude의 `acceptEdits`는 편집만
+자동 승인하므로 Bash는 여전히 프롬프트 → `--permission-prompts none`에 걸려 자동 거부된다.
+보고할 방법이 없으니 **무조건** `no_completion`이다.
+
+그때까지 성공한 협약 실행은 전부 `--yolo`(전면 승인)를 켠 것이었다. 그래서 안 드러났다.
+codex의 read-only 샌드박스에서 같은 문제를 이미 고쳤는데(§5.8.5), **claude·agy에는
+적용하지 않았다.** 같은 원인을 한 provider에서만 고친 셈이다.
+
+#### 대응 — 보고 명령만 콕 집어 허용
+
+| provider | `commandPermission` | 협약 사용 조건 |
+|---|---|---|
+| claude | `granular` | `--allowed-tools "Bash(conductor *)"` — **전면 승인 불필요** |
+| codex | `sandbox` | `approval_policy=never` + `--add-dir <runDir>` |
+| antigravity / gemini | `all-or-nothing` | **자동 승인 필요.** 명령을 골라 허용할 수단이 없다 |
+
+패턴 매칭이 안정적으로 맞으려면 명령이 **짧은 이름**이어야 한다. 공백과 백슬래시가 든
+절대 경로로는 `Bash(...)` 패턴이 신뢰할 수 없게 맞는다. 그래서 심 디렉토리를
+워커의 `PATH` 앞에 얹고 프리앰블은 `conductor`만 쓴다.
+
+#### 실패가 확정된 조합은 실행 전에 막는다
+
+`all-or-nothing` provider + 협약 + 자동 승인 없음 = 결과가 정해져 있다.
+실행해봐야 쿼터만 태우므로 `DispatchConfigError`로 즉시 거부하고 해결책을 알려준다.
+
+```
+antigravity는 협약 보고에 필요한 셸 명령만 골라 허용할 수 없습니다.
+도구 자동 승인(--yolo)을 켜거나, 협약(--protocol)을 끄세요.
+```
+
+UI에도 같은 경고를 띄운다 — 실행 버튼을 누르기 전에 보인다.
+
+> 교훈: **같은 원인의 버그를 한 provider에서만 고치면 나머지에서 다시 나온다.**
+> codex에서 "협약은 쓰기 권한을 요구한다"를 발견했을 때, 그게 provider 고유 문제인지
+> 협약 자체의 성질인지 물었어야 했다. 후자였다.
+
 ### 5.7.5 정산 규칙 (ADR-9 구현)
 
 | 상황 | outcome | status |
@@ -1237,6 +1283,7 @@ export default defineConfig({
 | 날짜 | 버전 | 변경 | 사유 |
 |---|---|---|---|
 | 2026-09-07 | v0.1 | 최초 작성 | 프로젝트 착수 스펙 정의 |
+| 2026-09-07 | v1.0 | 협약이 셸 권한을 요구한다는 것을 §5.7.4a에 정리. `commandPermission` 도입, claude는 보고 명령만 허용, 실패 확정 조합은 실행 전 거부 | 사용자가 UI 기본값으로 실행했다 실패한 것을 발견 |
 | 2026-09-07 | v0.9 | 역할별 담당 지정: 계획 파일 `routes` + `conductor.config.json`. 명시 지정이 교차 검증 휴리스틱을 이기도록 함. UI에 담당 편집기·프리셋 | "claude 팀장, agy 수행" 같은 팀 구성을 한 번만 정하도록 |
 | 2026-09-07 | v0.8 | 웹 UI(M6): §5.10. Q3 결정 뒤집음(TUI→웹). Coordinator의 되묻기 경로를 교체 가능하게 분리 | 계획 작성·되물음·diff 검토가 터미널로는 불편해짐 |
 | 2026-09-07 | v0.7 | M5 Governor & 페일오버: §5.9(retryOn 도입·쿼터 추적·재배치 실측). provider별 모델(`models`)로 수정, 약한 테스트가 덮은 구멍 보완 | 쿼터 소진이 실행을 멈추지 않게 함 |

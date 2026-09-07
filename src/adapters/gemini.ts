@@ -15,6 +15,7 @@ export class GeminiAdapter implements AgentAdapter {
     structuredOutput: false, // --json-schema / --output-schema 없음
     resume: 'respawn-with-id', // --session-id / --resume
     promptDelivery: 'stdin' as const, // npm .cmd 심 경유 → argv 개행 잘림
+    commandPermission: 'all-or-nothing' as const, // --yolo 뿐. 미실측
     mcpInjection: 'pre-registered', // `gemini mcp` 서브커맨드
   };
 

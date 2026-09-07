@@ -39,6 +39,7 @@ export class ClaudeAdapter implements AgentAdapter {
     structuredOutput: true, // --json-schema
     resume: 'stdin-stream', // --input-format stream-json
     promptDelivery: 'stdin' as const, // npm .cmd 심 경유 → argv 개행 잘림
+    commandPermission: 'granular' as const, // --allowed-tools "Bash(cmd *)"
     mcpInjection: 'per-invocation', // --mcp-config
   };
 
@@ -132,6 +133,14 @@ export class ClaudeAdapter implements AgentAdapter {
       args.push('--strict-mcp-config'); // --mcp-config로 준 것 외 MCP 서버 무시
       args.push('--setting-sources', ''); // user/project/local 설정 및 CLAUDE.md 미로드
       args.push('--disable-slash-commands'); // 스킬 목록 미주입
+    }
+
+    // 🔴 협약을 쓰면 워커가 셸로 보고해야 한다. acceptEdits는 편집만 자동 승인하므로
+    // Bash는 여전히 프롬프트 → --permission-prompts none에 걸려 자동 거부된다.
+    // 그러면 워커가 완료를 알릴 방법이 없어 무조건 no_completion으로 끝난다(실측).
+    // 보고 명령만 콕 집어 허용해서, 전면 승인 없이도 협약이 돌아가게 한다.
+    for (const command of req.allowCommands ?? []) {
+      args.push('--allowed-tools', `Bash(${command} *)`);
     }
 
     if (req.model) args.push('--model', req.model);

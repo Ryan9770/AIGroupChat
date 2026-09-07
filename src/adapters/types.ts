@@ -34,6 +34,13 @@ export interface HeadlessCapability {
    * 네이티브 실행 파일(agy.exe)은 개행이 보존되므로 argv로 넘겨도 된다.
    */
   readonly promptDelivery: 'argv' | 'stdin';
+  /**
+   * 특정 셸 명령만 골라 허용할 수 있는가.
+   *
+   * `granular`면 협약의 보고 명령만 열어줄 수 있다.
+   * `all-or-nothing`이면 협약을 쓰려면 autoApprove(전면 승인)가 필요하다.
+   */
+  readonly commandPermission: 'granular' | 'all-or-nothing' | 'sandbox';
 }
 
 /** preflight 결과. 자격증명 값은 절대 담지 않는다. §9.1 */

@@ -59,4 +59,14 @@ export interface TaskRequest {
    * 샌드박스가 있는 provider(codex)만 이걸 신경 쓴다.
    */
   writableDirs?: string[];
+  /**
+   * 워커가 반드시 셸에서 실행할 수 있어야 하는 명령.
+   *
+   * 워커 협약의 보고 명령(`conductor`)이 여기 들어간다. 이게 막히면 워커가
+   * 완료를 보고할 방법이 없어 무조건 no_completion으로 끝난다(실측).
+   *
+   * granular 권한을 지원하는 provider는 이 명령만 콕 집어 허용한다.
+   * 전부 아니면 전무인 provider는 autoApprove가 필요하다.
+   */
+  allowCommands?: string[];
 }

@@ -25,6 +25,7 @@ export class AntigravityAdapter implements AgentAdapter {
     // agy에는 --mcp-config가 없다. `agy mcp add`로 전역 사전 등록만 가능하다.
     // M3 공유 컨텍스트 버스가 claude와 다른 경로를 타야 한다는 뜻이다.
     promptDelivery: 'argv' as const, // 네이티브 agy.exe라 개행이 보존된다(실측)
+    commandPermission: 'all-or-nothing' as const, // --dangerously-skip-permissions 뿐
     mcpInjection: 'pre-registered',
   };
 

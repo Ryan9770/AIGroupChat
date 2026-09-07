@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { writeConductorShim } from '../src/orchestration/shim.js';
+import { pathWithShim, writeConductorShim } from '../src/orchestration/shim.js';
 import { ENV } from '../src/protocol/orchestration.js';
 import {
   appendMessage,
@@ -100,13 +100,16 @@ describe('run-store', () => {
 describe('worker CLI (실제 프로세스)', () => {
   let stateRoot: string;
   let runDir: string;
-  let shim: string;
+  let binDir: string;
+  let command: string;
 
   beforeAll(async () => {
     stateRoot = await mkdtemp(join(tmpdir(), 'conductor-shim-'));
     const created = await createRun({ stateRoot, objective: 'shim test' });
     runDir = created.runDir;
-    shim = await writeConductorShim(runPaths(runDir).bin);
+    const shim = await writeConductorShim(runPaths(runDir).bin);
+    binDir = shim.binDir;
+    command = shim.command;
   });
   afterAll(async () => {
     await rm(stateRoot, { recursive: true, force: true });
@@ -114,6 +117,8 @@ describe('worker CLI (실제 프로세스)', () => {
 
   const workerEnv = () => ({
     ...process.env,
+    // 운영과 같은 방식: 심 디렉토리를 PATH 앞에 얹어 짧은 이름으로 부른다.
+    PATH: pathWithShim(binDir),
     [ENV.runDir]: runDir,
     [ENV.runId]: runDir,
     [ENV.taskId]: 'task_x',
@@ -121,9 +126,9 @@ describe('worker CLI (실제 프로세스)', () => {
     [ENV.worker]: 'claude-1',
   });
 
-  // 심 경로는 인용부호가 붙어 돌아온다. 셸을 통해 실행해야 그대로 동작한다.
+  // PATH에 얹힌 심을 짧은 이름으로 부른다. 권한을 좁게 허용하려면 이 형태여야 한다.
   const runShim = (args: string) =>
-    execa(`${shim} ${args}`, {
+    execa(`${command} ${args}`, {
       shell: true,
       reject: false,
       env: workerEnv(),
@@ -158,10 +163,10 @@ describe('worker CLI (실제 프로세스)', () => {
   }, 60_000);
 
   it('정체성 환경변수가 없으면 명확히 거부한다', async () => {
-    const result = await execa(`${shim} worker heartbeat`, {
+    const result = await execa(`${command} worker heartbeat`, {
       shell: true,
       reject: false,
-      env: { ...process.env, [ENV.runDir]: '', [ENV.dispatchId]: '' },
+      env: { ...process.env, PATH: pathWithShim(binDir), [ENV.runDir]: '', [ENV.dispatchId]: '' },
       stdin: 'ignore',
       timeout: 60_000,
     });

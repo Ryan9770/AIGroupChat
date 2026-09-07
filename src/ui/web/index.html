@@ -167,6 +167,7 @@ pre.diff{background:var(--code);border:1px solid var(--line);border-radius:8px;p
           <input type="checkbox" id="planYolo" style="width:auto"> yolo</label>
         <span style="width:150px"><input id="planBudget" placeholder="예산 $ (선택)"></span>
       </div>
+      <div class="hint" id="planWarn"></div>
       <div id="planPreviewOut" style="margin-top:12px"></div>
     </div>
     <div id="planAsk"></div>
@@ -247,6 +248,8 @@ async function loadStatus() {
     $('runAgent').innerHTML = usable.map((p) => `<option value="${esc(p.provider)}">${esc(p.provider)}</option>`).join('');
     $('conn').textContent = `${usable.length}/${providers.length} 사용 가능`;
     renderRoutes();
+    syncRunWarn();
+    syncPlanWarn();
   } catch (err) {
     $('conn').innerHTML = `<span class="bad">연결 실패 — 토큰이 포함된 주소로 접속했는지 확인하세요</span>`;
   }
@@ -299,12 +302,25 @@ function renderAsk(container, runId, event) {
 /* ── 단일 실행 ──────────────────────────────────────────── */
 let runSource = null, runId = null;
 function syncRunWarn() {
-  const yolo = $('runYolo').checked, ws = $('runWs').checked;
-  $('runWarn').innerHTML = yolo && !ws
-    ? '<span class="bad">⚠ 작업 공간 격리 없이 도구를 자동 승인하면 워커가 원본 폴더를 바로 수정합니다.</span>'
-    : '';
+  const yolo = $('runYolo').checked, ws = $('runWs').checked, proto = $('runProto').checked;
+  const agent = providers.find((p) => p.provider === $('runAgent').value);
+  const notes = [];
+
+  // 협약은 워커가 셸로 보고하게 만든다. 명령을 골라 허용할 수 없는 provider는
+  // 자동 승인 없이는 보고를 못 해 무조건 실패한다.
+  if (proto && !yolo && agent?.commandPermission === 'all-or-nothing') {
+    notes.push(`<span class="bad">⚠ ${esc(agent.provider)}는 되묻기/보고에 필요한 명령만 골라 허용할 수 없습니다.
+      <b>도구 자동 승인을 켜거나</b> 되묻기를 끄세요. 지금 상태로는 실행이 반드시 실패합니다.</span>`);
+  }
+  if (yolo && !ws) {
+    notes.push('<span class="bad">⚠ 작업 공간 격리 없이 도구를 자동 승인하면 워커가 원본 폴더를 바로 수정합니다.</span>');
+  }
+  $('runWarn').innerHTML = notes.join('<br>');
 }
-$('runYolo').onchange = syncRunWarn; $('runWs').onchange = syncRunWarn;
+$('runYolo').onchange = syncRunWarn;
+$('runWs').onchange = syncRunWarn;
+$('runProto').onchange = syncRunWarn;
+$('runAgent').onchange = syncRunWarn;
 
 $('runGo').onclick = async () => {
   $('runOut').textContent = ''; $('runAsk').innerHTML = '';
@@ -383,6 +399,20 @@ $('presetClaudeLeads').onclick = () => {
   renderRoutes();
 };
 $('presetClear').onclick = () => { routes = {}; renderRoutes(); };
+
+function syncPlanWarn() {
+  // 계획은 협약이 기본 ON이다. 명령을 골라 허용 못 하는 provider가 후보에 있으면
+  // 자동 승인 없이는 그 Task가 반드시 실패한다.
+  const blocked = providers
+    .filter((p) => p.installed && p.authed === true && p.commandPermission === 'all-or-nothing')
+    .map((p) => p.provider);
+  $('planWarn').innerHTML =
+    !$('planYolo').checked && blocked.length
+      ? `<span class="bad">⚠ ${blocked.join(', ')}가 배정되면 되묻기/보고용 명령이 막혀 그 Task는 실패합니다.
+         <b>yolo를 켜세요</b> (각 Task는 자기 worktree에서만 작업합니다).</span>`
+      : '';
+}
+$('planYolo').onchange = syncPlanWarn;
 
 const SAMPLE = {
   objective: 'README에 설치 안내 섹션 추가',

@@ -1,5 +1,5 @@
 import { isProvider } from '../adapters/registry.js';
-import { executeDispatch, type WorkspacePlan } from '../core/dispatch.js';
+import { DispatchConfigError, executeDispatch, type WorkspacePlan } from '../core/dispatch.js';
 import type { AgentEvent } from '../protocol/events.js';
 import type { ExecutionMode, Provider } from '../protocol/provider.js';
 import { createRun, newTaskId } from '../store/run-store.js';
@@ -147,6 +147,12 @@ export async function run(prompt: string, opts: RunCommandOptions): Promise<numb
       },
     });
   } catch (err) {
+    if (err instanceof DispatchConfigError) {
+      process.stderr.write(`${red(err.message)}
+${dim(err.hint)}
+`);
+      return 2;
+    }
     if (err instanceof WorkspaceError) {
       process.stderr.write(`${red(err.message)}\n`);
       if (err.hint) process.stderr.write(`${dim(err.hint)}\n`);

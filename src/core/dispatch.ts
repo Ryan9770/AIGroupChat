@@ -1,6 +1,6 @@
 import { getAdapter } from '../adapters/registry.js';
 import { Coordinator, type PendingQuestion } from '../orchestration/coordinator.js';
-import { writeConductorShim } from '../orchestration/shim.js';
+import { pathWithShim, writeConductorShim } from '../orchestration/shim.js';
 import type { AgentEvent } from '../protocol/events.js';
 import {
   ENV,
@@ -95,10 +95,35 @@ export interface DispatchResult {
  * `conductor run`(단일 실행)과 스케줄러(계획 실행)가 **같은 경로**를 쓴다.
  * 두 곳에 복제하면 한쪽만 고쳐지는 사고가 난다.
  */
+export class DispatchConfigError extends Error {
+  constructor(
+    message: string,
+    readonly hint: string,
+  ) {
+    super(message);
+    this.name = 'DispatchConfigError';
+  }
+}
+
 export async function executeDispatch(request: DispatchRequest): Promise<DispatchResult> {
   const adapter = getAdapter(request.provider);
   const notice = (text: string) => request.observer?.onNotice?.(text);
   const startedAt = Date.now();
+
+  // 🔴 협약은 워커가 셸로 보고하게 만든다. 명령을 골라 허용할 수 없는 provider는
+  // 전면 승인(autoApprove) 없이는 보고를 못 하고, 무조건 no_completion으로 끝난다.
+  // 실행해봐야 결과가 정해져 있으므로 쿼터를 태우기 전에 막는다. (실측으로 확인된 조합)
+  if (
+    request.protocol &&
+    !request.autoApprove &&
+    adapter.capability.commandPermission === 'all-or-nothing'
+  ) {
+    throw new DispatchConfigError(
+      `${request.provider}는 협약 보고에 필요한 셸 명령만 골라 허용할 수 없습니다.`,
+      '도구 자동 승인(--yolo)을 켜거나, 협약(--protocol)을 끄세요. ' +
+        '자동 승인을 켤 때는 작업 공간 격리(--workspace)를 함께 쓰는 것이 안전합니다.',
+    );
+  }
 
   // ── 워크스페이스 ────────────────────────────────────────────────────────
   let workspace: Workspace | undefined;
@@ -131,6 +156,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
 
   let workerPrompt = taskWithContext;
   let workerEnv: Record<string, string> = {};
+  let shimCommand: string | undefined;
 
   if (request.protocol && request.runDir) {
     const paths = runPaths(request.runDir);
@@ -147,18 +173,22 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
     };
     await saveDispatch(request.runDir, dispatchRecord);
 
-    const cli = await writeConductorShim(paths.bin);
+    const shim = await writeConductorShim(paths.bin);
+    shimCommand = shim.command;
     workerPrompt = buildDispatchPreamble({
       taskId: request.taskId,
       dispatchId,
       taskSpec: taskWithContext,
       workerHandle,
-      cli,
+      cli: shim.command,
       canAsk: request.answerMode === 'human',
       ...(drift ? { baseDrift: drift } : {}),
     });
 
     workerEnv = {
+      // 심을 PATH에 얹어 워커가 `conductor`만 쳐도 되게 한다.
+      // 절대 경로를 쓰면 권한을 좁게 허용하는 패턴이 안정적으로 안 맞는다.
+      PATH: pathWithShim(shim.binDir),
       [ENV.runDir]: request.runDir,
       [ENV.runId]: request.runDir,
       [ENV.taskId]: request.taskId,
@@ -196,6 +226,8 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
         // 협약을 쓰면 워커가 run 디렉토리에 보고 파일을 써야 한다.
         // 샌드박스가 있는 provider는 이 경로가 열려 있어야 완료를 알릴 수 있다.
         ...(request.protocol && request.runDir ? { writableDirs: [request.runDir] } : {}),
+        // 협약을 쓰면 워커가 이 명령으로 보고해야 한다. 막히면 완료를 알릴 방법이 없다.
+        ...(shimCommand ? { allowCommands: [shimCommand] } : {}),
         ...(request.model ? { model: request.model } : {}),
         ...(request.resumeId ? { resumeId: request.resumeId } : {}),
       },

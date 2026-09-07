@@ -22,6 +22,9 @@ export class CodexAdapter implements AgentAdapter {
   readonly capability: HeadlessCapability = {
     printFlag: 'exec', streamJson: true, structuredOutput: true,
     resume: 'respawn-with-id', promptDelivery: 'stdin', mcpInjection: 'unknown',
+    // approval_policy=never + 샌드박스. 명령을 골라 막는 게 아니라
+    // 샌드박스 경계로 다룬다. 협약 보고는 writableDirs로 열어준다.
+    commandPermission: 'sandbox',
   };
 
   async preflight(offline: boolean): Promise<PreflightResult> {
