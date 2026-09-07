@@ -1,0 +1,10 @@
+{
+  "id": "license-field",
+  "title": "package.json에 license 추가 + LICENSE 파일 생성",
+  "prompt": "이 저장소에 MIT 라이선스를 적용하라. package.json에 license 필드를 추가하고, 저장소 루트에 LICENSE 파일을 만들어라. LICENSE 파일에는 저작권자로 package.json의 author 값을 쓰고, 연도는 2026으로 하라.",
+  "repo": {
+    "package.json": "{\n  \"name\": \"widget-lib\",\n  \"version\": \"0.3.1\",\n  \"author\": \"Hana Kim\",\n  \"main\": \"src/index.js\"\n}\n",
+    "src/index.js": "export function widget(n) {\n  return n * 2;\n}\n",
+    "README.md": "# widget-lib\n\n작은 유틸리티 라이브러리.\n"
+  }
+}

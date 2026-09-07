@@ -1,0 +1,10 @@
+{
+  "id": "config-validation",
+  "title": "설정 로더에 검증 추가 (기존 동작 보존)",
+  "prompt": "src/config.js의 loadConfig가 잘못된 설정을 조용히 통과시키고 있다. 검증을 추가하라. port는 1~65535 사이의 정수여야 하고, host는 비어 있지 않은 문자열이어야 하며, retries는 0 이상의 정수여야 한다. 문제가 있으면 무엇이 잘못됐는지 알 수 있는 메시지와 함께 Error를 던져라. 기존에 통과하던 올바른 설정은 그대로 동작해야 한다.",
+  "repo": {
+    "package.json": "{\n  \"name\": \"svc\",\n  \"version\": \"1.2.0\",\n  \"type\": \"module\"\n}\n",
+    "src/config.js": "export function loadConfig(raw) {\n  return {\n    host: raw.host,\n    port: raw.port,\n    retries: raw.retries ?? 3,\n  };\n}\n",
+    "README.md": "# svc\n\n설정 로더.\n"
+  }
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { doctor } from './commands/doctor.js';
+import { evaluate } from './commands/eval.js';
 import { planRun, planShow } from './commands/plan.js';
 import { run } from './commands/run.js';
 import { ui } from './commands/ui.js';
@@ -12,6 +13,7 @@ import {
   workerHeartbeat,
 } from './commands/worker.js';
 import { workspaceList, workspaceRemove } from './commands/workspace.js';
+import { isProvider } from './adapters/registry.js';
 import { PROVIDERS } from './protocol/provider.js';
 
 const program = new Command();
@@ -188,6 +190,46 @@ workspace
   .action(async (id: string, opts: { cwd: string; force: boolean }) => {
     process.exitCode = await workspaceRemove(opts.cwd, id, opts.force);
   });
+
+program
+  .command('eval')
+  .description('같은 과제를 조건별로 돌려 "여러 벤더가 정말 나은가"를 수치로 비교한다')
+  .option('--tasks <dir>', '과제 디렉토리', 'eval/tasks')
+  .option('--reps <n>', '조건당·과제당 반복 횟수', '3')
+  .option('--implementer <provider>', '구현을 맡을 provider (모든 조건 동일)')
+  .option('--task <ids>', '쉼표로 구분한 과제 ID')
+  .option('--arm <names>', '쉼표로 구분한 조건 (solo,self-review,cross-review)')
+  .option('--timeout <ms>', 'Task별 타임아웃', '900000')
+  .option('--out <dir>', '결과 저장 위치', '.conductor/eval')
+  .option('--dry-run', '실행하지 않고 계획만 보여준다', false)
+  .action(
+    async (opts: {
+      tasks: string;
+      reps: string;
+      implementer?: string;
+      task?: string;
+      arm?: string;
+      timeout: string;
+      out: string;
+      dryRun: boolean;
+    }) => {
+      const split = (v?: string) =>
+        v ? v.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+
+      process.exitCode = await evaluate({
+        tasksDir: opts.tasks,
+        reps: Number(opts.reps),
+        timeoutMs: Number(opts.timeout),
+        outDir: opts.out,
+        dryRun: opts.dryRun,
+        ...(opts.implementer && isProvider(opts.implementer)
+          ? { implementer: opts.implementer }
+          : {}),
+        ...(split(opts.task) ? { taskFilter: split(opts.task)! } : {}),
+        ...(split(opts.arm) ? { armFilter: split(opts.arm)! as never } : {}),
+      });
+    },
+  );
 
 program
   .command('ui')

@@ -32,7 +32,7 @@ describe('계획 검증', () => {
     expect(issues).toContainEqual({ taskId: 'a', message: '중복된 Task ID' });
   });
 
-  it('workspace 상속은 dependsOn을 요구한다', () => {
+  it('의존하지 않는 workspace를 상속하면 잡는다', () => {
     // 원본이 아직 안 끝났는데 그 worktree에 들어가면 반쯤 만들어진 상태를 본다.
     const issues = validatePlan(
       plan([
@@ -40,7 +40,20 @@ describe('계획 검증', () => {
         { id: 'review', spec: 'y', workspace: 'inherit:impl' },
       ]),
     );
-    expect(issues.some((i) => i.message.includes('dependsOn에도'))).toBe(true);
+    expect(issues.some((i) => i.message.includes('의존해야 합니다'))).toBe(true);
+  });
+
+  it('간접 의존이면 workspace 상속을 허용한다', () => {
+    // revise → review → implement. implement는 이미 끝났으므로 안전하다.
+    // 직접 의존만 인정하면 멀쩡한 계획이 거부된다(평가 하네스에서 실제로 걸렸다).
+    const issues = validatePlan(
+      plan([
+        { id: 'impl', spec: 'x', workspace: 'new' },
+        { id: 'review', spec: 'y', dependsOn: ['impl'], workspace: 'inherit:impl' },
+        { id: 'revise', spec: 'z', dependsOn: ['review'], workspace: 'inherit:impl' },
+      ]),
+    );
+    expect(issues).toEqual([]);
   });
 
   it('올바른 계획은 문제를 내지 않는다', () => {

@@ -105,11 +105,12 @@ export function validatePlan(plan: Plan): PlanIssue[] {
       const from = task.workspace.slice('inherit:'.length);
       if (!ids.has(from)) {
         issues.push({ taskId: task.id, message: `없는 워크스페이스 원본: ${from}` });
-      } else if (!task.dependsOn.includes(from)) {
+      } else if (!dependsOnTransitively(plan, task.id, from)) {
         // 원본이 아직 안 끝났는데 그 worktree에 들어가면 반쯤 만들어진 상태를 본다.
+        // 간접 의존(A→B→C에서 C가 A의 worktree를 상속)은 안전하므로 허용한다.
         issues.push({
           taskId: task.id,
-          message: `workspace를 상속하려면 ${from}을 dependsOn에도 넣어야 합니다`,
+          message: `workspace를 상속하려면 ${from}에 (간접적으로라도) 의존해야 합니다`,
         });
       }
     }
@@ -117,6 +118,22 @@ export function validatePlan(plan: Plan): PlanIssue[] {
 
   issues.push(...findCycles(plan));
   return issues;
+}
+
+/** from이 to에 직접 또는 간접으로 의존하는가. 순환이 있어도 멈춘다. */
+function dependsOnTransitively(plan: Plan, from: string, to: string): boolean {
+  const byId = new Map(plan.tasks.map((t) => [t.id, t]));
+  const seen = new Set<string>();
+  const stack = [...(byId.get(from)?.dependsOn ?? [])];
+
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (id === to) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    stack.push(...(byId.get(id)?.dependsOn ?? []));
+  }
+  return false;
 }
 
 function findCycles(plan: Plan): PlanIssue[] {
