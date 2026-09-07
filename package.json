@@ -1,0 +1,31 @@
+{
+  "name": "conductor",
+  "version": "0.0.1",
+  "description": "여러 구독형 AI 코딩 CLI를 헤드리스로 지휘하는 멀티 에이전트 오케스트레이터",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "conductor": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "doctor": "tsx src/index.ts doctor",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "execa": "^9.5.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
