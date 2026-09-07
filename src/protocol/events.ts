@@ -72,6 +72,14 @@ export const AgentEvent = z.discriminatedUnion('kind', [
     code: z.string(),
     message: z.string(),
     retryable: z.boolean(),
+    /**
+     * 재시도한다면 **어디에** 맡겨야 하는가. retryable일 때만 의미가 있다.
+     *
+     * 불리언 하나로는 부족하다. 타임아웃은 같은 provider에 다시 던지면 되지만,
+     * 쿼터 소진은 같은 곳에 백 번 던져도 똑같이 막힌다 — 다른 벤더로 넘겨야 한다.
+     * Governor가 이 값으로 페일오버를 결정한다.
+     */
+    retryOn: z.enum(['same-provider', 'other-provider']).optional(),
   }),
   z.object({
     kind: z.literal('session.finished'),

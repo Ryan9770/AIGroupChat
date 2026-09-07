@@ -128,6 +128,9 @@ plan
   .option('-P, --no-protocol', '워커 협약을 끈다')
   .option('--auto-answer', '워커 질문에 자동 응답한다', false)
   .option('-v, --verbose', '각 워커의 출력을 그대로 보여준다', false)
+  .option('--max-attempts <n>', 'Task 하나당 최대 시도 횟수(페일오버 포함)', '3')
+  .option('--budget-usd <n>', '실행 전체 비용 상한. 넘으면 남은 Task를 건너뛴다')
+  .option('--max-per-provider <n>', 'provider별 배치 수 상한 (구독 사용량 보호)')
   .action(
     async (
       file: string,
@@ -139,6 +142,9 @@ plan
         protocol: boolean;
         autoAnswer: boolean;
         verbose: boolean;
+        maxAttempts: string;
+        budgetUsd?: string;
+        maxPerProvider?: string;
       },
     ) => {
       process.exitCode = await planRun(file, {
@@ -149,6 +155,11 @@ plan
         answerMode: opts.autoAnswer ? 'auto' : 'human',
         timeoutMs: Number(opts.timeout),
         verbose: opts.verbose,
+        maxAttempts: Number(opts.maxAttempts),
+        ...(opts.budgetUsd !== undefined ? { budgetUsd: Number(opts.budgetUsd) } : {}),
+        ...(opts.maxPerProvider !== undefined
+          ? { maxPerProvider: Number(opts.maxPerProvider) }
+          : {}),
       });
     },
   );

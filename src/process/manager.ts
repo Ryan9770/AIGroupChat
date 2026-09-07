@@ -136,6 +136,7 @@ export async function* runAgent(
     message,
     // 타임아웃은 재시도할 만하다. 인자가 틀려서 죽은 건 재시도해도 똑같이 죽는다.
     retryable: timedOut,
+    ...(timedOut ? { retryOn: 'same-provider' as const } : {}),
   };
   yield {
     kind: 'session.finished',

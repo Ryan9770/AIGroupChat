@@ -11,17 +11,29 @@
       "id": "implement",
       "role": "implement",
       "spec": "README.md에 '설치' 섹션을 추가하라. 참고 자료의 설계를 따르되, 실제 저장소 내용과 어긋나면 설계가 아니라 저장소를 기준으로 삼아라.",
-      "dependsOn": ["design"],
-      "context": ["design"],
+      "dependsOn": [
+        "design"
+      ],
+      "context": [
+        "design"
+      ],
       "workspace": "new"
     },
     {
       "id": "review",
       "role": "review",
       "spec": "이 작업 트리의 변경(git diff HEAD)을 검토하라. 설치 안내가 실제로 동작하는지, 저장소 내용과 어긋나는 부분이 없는지 확인하고 문제를 나열하라. 파일은 수정하지 마라.",
-      "dependsOn": ["implement"],
-      "context": ["design", "implement"],
-      "workspace": "inherit:implement"
+      "dependsOn": [
+        "implement"
+      ],
+      "context": [
+        "design",
+        "implement"
+      ],
+      "workspace": "inherit:implement",
+      "models": {
+        "codex": "gpt-5.4-mini"
+      }
     }
   ]
 }

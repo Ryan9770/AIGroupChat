@@ -1,0 +1,18 @@
+{
+  "objective": "쿼터 소진 시 다른 벤더로 자동 재배치되는지 확인",
+  "tasks": [
+    {
+      "id": "review",
+      "role": "review",
+      "spec": "이 작업 트리의 git diff HEAD를 확인하고, 변경 내용을 두 문장으로 요약하라. 파일은 수정하지 마라.",
+      "workspace": "none",
+      "providers": [
+        "codex",
+        "claude"
+      ],
+      "models": {
+        "codex": "gpt-5.4-mini"
+      }
+    }
+  ]
+}

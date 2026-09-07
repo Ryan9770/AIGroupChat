@@ -159,7 +159,13 @@ describe('에러 분류 (Governor 입력)', () => {
     // 실측 문구: "You've hit your usage limit. Upgrade to Pro..."
     // 여기서 놓치면 Governor가 페일오버하지 않고 그냥 실패로 끝난다.
     const error = providerError("You've hit your usage limit. Upgrade to Pro", 'codex_error');
-    expect(error.code).toBe('rate_limited');
+    // code만 확인하면 부족하다. 실제로 이 구멍 때문에 페일오버가 조용히 안 됐다 —
+    // 분류는 맞았지만 retryOn이 비어 있어 스케줄러가 다음 벤더로 넘기지 않았다.
+    expect(error).toMatchObject({
+      code: 'rate_limited',
+      retryable: true,
+      retryOn: 'other-provider',
+    });
   });
 
   it('모델 미지원은 쿼터가 아니라 일반 오류다', () => {
@@ -174,5 +180,18 @@ describe('에러 분류 (Governor 입력)', () => {
 
   it('일시적 장애는 재시도 가능으로 표시한다', () => {
     expect(providerError('service overloaded', 'x').retryable).toBe(true);
+  });
+});
+
+describe('provider별 모델', () => {
+  it('페일오버해도 다른 벤더의 모델이 따라가지 않는다', () => {
+    // codex용 gpt-5.4-mini가 claude로 넘어가 즉시 실패한 실측 버그.
+    const parsed = Plan.parse({
+      objective: 'x',
+      tasks: [{ id: 'a', spec: 'y', providers: ['codex', 'claude'], models: { codex: 'gpt-5.4-mini' } }],
+    });
+    const task = parsed.tasks[0]!;
+    expect(task.models?.codex).toBe('gpt-5.4-mini');
+    expect(task.models?.claude).toBeUndefined();
   });
 });

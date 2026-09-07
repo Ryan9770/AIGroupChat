@@ -52,9 +52,18 @@ describe('M2a error and stream boundaries', () => {
       }
       expect(adapter.parseLine(' ', {})).toEqual([]);
     });
-    it(`${adapter.provider}: classifies quotas without infinite immediate retry`, () => {
+    it(`${adapter.provider}: routes quota exhaustion to another provider`, () => {
+      // 원래는 retryable:false로 두어 같은 provider 무한 재시도를 막았다.
+      // M5에서 retryOn을 추가해 "재시도 가능"과 "어디에 재시도"를 분리했다.
+      // 같은 곳에 다시 던지는 건 여전히 막히고(retryOn !== 'same-provider'),
+      // 대신 Governor가 다른 벤더로 넘길 수 있게 됐다.
       const events = parse(adapter, [{ type: 'error', message: '429 quota exhausted', severity: 'error' }]);
-      expect(events[0]).toMatchObject({ kind: 'error', code: 'rate_limited', retryable: false });
+      expect(events[0]).toMatchObject({
+        kind: 'error',
+        code: 'rate_limited',
+        retryable: true,
+        retryOn: 'other-provider',
+      });
     });
     it(`${adapter.provider}: isolates state between simultaneous sessions`, () => {
       const first: ParseContext = {};

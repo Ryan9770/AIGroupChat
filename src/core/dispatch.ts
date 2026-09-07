@@ -80,6 +80,11 @@ export interface DispatchResult {
   durationMs: number;
   /** 사람에게 보여줄 판정 근거. */
   note?: string;
+  /**
+   * 실행 중 나온 오류들. Governor가 페일오버를 판단하는 재료다.
+   * 결과에 담아 넘기지 않으면 스케줄러가 "왜 실패했는지" 알 수 없다.
+   */
+  errors: Extract<AgentEvent, { kind: 'error' }>[];
 }
 
 /**
@@ -173,6 +178,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
   let sessionId: string | undefined;
   let usage: Extract<AgentEvent, { kind: 'usage' }> | undefined;
   let finalText = '';
+  const errors: Extract<AgentEvent, { kind: 'error' }>[] = [];
 
   try {
     const events = runAgent(
@@ -199,6 +205,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
     for await (const event of events) {
       request.observer?.onEvent?.(event);
       if (event.kind === 'session.started') sessionId = event.sessionId;
+      else if (event.kind === 'error') errors.push(event);
       else if (event.kind === 'usage') usage = event;
       else if (event.kind === 'message.final') finalText = event.text;
       else if (event.kind === 'session.finished') status = event.status;
@@ -268,6 +275,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
     outcome,
     report,
     filesChanged,
+    errors,
     durationMs: Date.now() - startedAt,
     ...(workspace ? { workspace } : {}),
     ...(sessionId ? { sessionId } : {}),

@@ -5,7 +5,7 @@
 
 전체 설계는 [docs/SPEC.md](docs/SPEC.md) 참조.
 
-**현재 상태: M4 완료** — 하나의 목표를 여러 Task로 쪼개 **서로 다른 AI에 배분**하고, 각 Task가 정산된 뒤에만 다음으로 넘어간다. 리뷰는 구현자와 다른 벤더가 맡는다.
+**현재 상태: M5 완료** — 여러 AI에 일을 배분하고, **쿼터가 소진되면 자동으로 다른 벤더가 이어받는다.** 리뷰는 구현자와 다른 벤더가 맡는다.
 
 ---
 
@@ -197,7 +197,7 @@ review     review     implement  inherit:implement  codex        claude,antigrav
 | `context` | 이 Task들의 산출물을 참고 자료로 넘긴다 |
 | `workspace` | `none` / `new` / `inherit:<taskId>` |
 | `providers` | 라우팅 후보 직접 지정 |
-| `model` | 벤더 고유 모델 (codex는 지정이 필요할 수 있다 — 아래 참조) |
+| `models` | **provider별** 모델. `{"codex": "gpt-5.4-mini"}` — 벤더마다 이름이 달라 반드시 묶어야 한다 |
 
 **`inherit:`** — 리뷰어가 구현 결과를 보려면 같은 worktree에 있어야 한다. 별도로 파면
 리뷰어에게 변경이 보이지 않는다. `inherit:X`인데 `dependsOn`에 X가 없으면 실행 전에 거부한다.
@@ -212,6 +212,43 @@ review    codex, claude, antigravity
 
 gemini는 기본 후보에서 제외돼 있다 — 파서는 있지만 로그인 검증이 보류 상태다.
 `providers`로 지정하면 쓸 수 있다.
+
+### 쿼터 소진 시 자동 재배치
+
+한 벤더의 한도가 차면 **같은 Task를 다음 후보에게 넘긴다.**
+
+```
+▶ review → codex
+  ↻ codex → claude (rate_limited) — 같은 Task의 새 시도
+▶ review → claude
+  ✓ succeeded  21.2s
+
+재배치
+  review codex(rate_limited) → claude
+
+쿼터
+  codex 쿼터 소진 — 약 60분 뒤 해제 (You've hit your usage limit... try again at 3:06 PM.)
+```
+
+넘기는 기준은 **오류의 종류**다.
+
+| 실패 | 동작 |
+|---|---|
+| 쿼터 소진 | 다른 벤더로 재배치 |
+| 타임아웃·일시적 장애 | 같은 벤더 재시도 대상으로 분류 (실행은 아직 미구현) |
+| 모델 미지원·인증 실패 | 넘기지 않는다 — 다른 벤더를 태워도 안 풀린다 |
+| 워커가 `failed`로 보고 | 넘기지 않는다 — 과제 자체의 문제일 수 있다 |
+
+claude는 매 턴 사용률을 알려주므로 **막히기 전에** 미리 피할 수 있고,
+codex는 한도에 닿아야 알려주므로 반응형으로 처리한다.
+
+| 옵션 | 설명 |
+|---|---|
+| `--max-attempts <n>` | Task당 최대 시도 횟수 (기본 3) |
+| `--budget-usd <n>` | 실행 전체 비용 상한. 넘으면 남은 Task를 건너뛴다 |
+| `--max-per-provider <n>` | provider별 배치 수 상한 (구독 사용량 보호) |
+
+> 쿼터 상태는 **실행 단위로만 유지된다.** 프로세스가 끝나면 사라진다.
 
 ### Task 간 산출물 전달
 
@@ -328,6 +365,7 @@ src/
 │   └── manager.ts          spawn → 라인 분해 → 정규화 이벤트 스트리밍
 ├── core/
 │   ├── dispatch.ts         Task 하나를 워커에 맡기고 정산까지 (run·plan 공용)
+│   ├── governor.ts         쿼터 추적 + 페일오버 판단
 │   ├── scheduler.ts        DAG 실행 + 정산 게이팅
 │   ├── router.ts           역할 → provider 배정, 교차 검증
 │   └── context.ts          앞선 산출물 주입 (프롬프트 인젝션 방어)

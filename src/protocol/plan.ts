@@ -46,7 +46,13 @@ export const PlanTask = z.object({
   mode: z.enum(['plan', 'write']).optional(),
   /** 라우팅 후보를 직접 지정한다. 비우면 role별 기본값. */
   providers: z.array(z.enum(PROVIDERS)).optional(),
-  model: z.string().optional(),
+  /**
+   * provider별 모델. 모델 이름은 벤더마다 다르므로 반드시 provider로 묶는다.
+   *
+   * 하나의 문자열로 두면 페일오버할 때 그대로 따라가서, 예컨대 codex용
+   * `gpt-5.4-mini`가 claude에 넘어가 즉시 실패한다(실측).
+   */
+  models: z.record(z.enum(PROVIDERS), z.string()).optional(),
 });
 export type PlanTask = z.infer<typeof PlanTask>;
 

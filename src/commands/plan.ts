@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { allAdapters } from '../adapters/registry.js';
+import { Governor } from '../core/governor.js';
 import { runPlan, SchedulerError, type TaskOutcome } from '../core/scheduler.js';
 import { DEFAULT_ROUTES, route } from '../core/router.js';
 import { Plan, topoOrder, validatePlan } from '../protocol/plan.js';
@@ -96,6 +97,12 @@ export interface PlanRunOptions {
   answerMode: 'human' | 'auto';
   timeoutMs: number;
   verbose: boolean;
+  /** 실행 전체 비용 상한(USD). */
+  budgetUsd?: number;
+  /** Task 하나당 최대 시도 횟수(페일오버 포함). */
+  maxAttempts: number;
+  /** provider별 배치 수 상한. 구독 사용량 보호용. */
+  maxPerProvider?: number;
 }
 
 export async function planRun(path: string, opts: PlanRunOptions): Promise<number> {
@@ -112,6 +119,13 @@ export async function planRun(path: string, opts: PlanRunOptions): Promise<numbe
 
   process.stdout.write(`\n${bold(plan.objective)}\n`);
   process.stdout.write(`${dim('run')} ${relative(stateRoot, runDir).split('\\').join('/')}\n\n`);
+
+  const governor = new Governor({
+    ...(opts.budgetUsd !== undefined ? { budgetUsd: opts.budgetUsd } : {}),
+    ...(opts.maxPerProvider !== undefined
+      ? { maxDispatchesPerProvider: opts.maxPerProvider }
+      : {}),
+  });
 
   const controller = new AbortController();
   const onSigint = () => controller.abort();
@@ -130,6 +144,14 @@ export async function planRun(path: string, opts: PlanRunOptions): Promise<numbe
       answerMode: opts.answerMode,
       timeoutMs: opts.timeoutMs,
       signal: controller.signal,
+      governor,
+      maxAttempts: opts.maxAttempts,
+      onFailover: (taskId, from, to, reason) => {
+        process.stdout.write(
+          `  ${yellow(`↻ ${from} → ${to}`)} ${dim(`(${reason}) — 같은 Task의 새 시도`)}
+`,
+        );
+      },
       onTaskStart: (task, provider, reason) => {
         process.stdout.write(`${dim('▶')} ${bold(task.id)} ${dim('→')} ${cyan(provider)}\n`);
         if (reason.includes('⚠')) process.stdout.write(`  ${yellow(reason)}\n`);
@@ -188,7 +210,35 @@ export async function planRun(path: string, opts: PlanRunOptions): Promise<numbe
     )}\n`,
   );
 
-  const totalCost = outcomes.reduce((sum, o) => sum + (o.result?.usage?.costUsd ?? 0), 0);
+  const retried = outcomes.filter((o) => o.attempts.length > 1);
+  if (retried.length > 0) {
+    process.stdout.write(`
+${dim('재배치')}
+`);
+    for (const outcome of retried) {
+      const trail = outcome.attempts
+        .map((a) => `${a.provider}${a.outcome === 'succeeded' ? '' : `(${a.failoverReason ?? a.outcome})`}`)
+        .join(' → ');
+      process.stdout.write(`  ${cyan(outcome.taskId)} ${trail}
+`);
+    }
+  }
+
+  const strained = governor.snapshot().filter((s) => s.blockedUntil !== undefined || (s.utilization ?? 0) >= 0.8);
+  if (strained.length > 0) {
+    process.stdout.write(`
+${dim('쿼터')}
+`);
+    for (const state of strained) {
+      const availability = governor.availability(state.provider);
+      process.stdout.write(
+        `  ${cyan(state.provider)} ${availability.usable ? yellow(availability.reason ?? '') : red(availability.reason ?? '')}
+`,
+      );
+    }
+  }
+
+  const totalCost = governor.totalCostUsd;
   const failed = outcomes.filter((o) => o.state !== 'succeeded');
 
   if (totalCost > 0) process.stdout.write(`\n${dim('cost')} $${totalCost.toFixed(4)}`);
