@@ -208,6 +208,11 @@ document.querySelectorAll('nav button').forEach((btn) => {
 /* ── 현황 ───────────────────────────────────────────────── */
 let providers = [];
 async function loadStatus() {
+  // doctor 프로브가 네트워크를 타서 몇 초 걸린다. 빈 표를 보여주면 고장난 것처럼 보인다.
+  $('conn').textContent = '확인 중…';
+  if (!$('provRows').children.length) {
+    $('provRows').innerHTML = '<tr><td colspan="5" class="muted">provider 상태를 확인하는 중입니다…</td></tr>';
+  }
   try {
     const data = await api('/api/status');
     providers = data.providers;
@@ -237,7 +242,7 @@ async function loadStatus() {
 }
 function setCwdLabel() {
   // 전체 경로는 길어서 헤더를 밀어낸다. 뒤쪽 두 조각만 보여준다.
-  const parts = $('cwd').value.replace(/\/g, '/').split('/').filter(Boolean);
+  const parts = $('cwd').value.split(/[\\/]+/).filter(Boolean);
   $('cwdLabel').textContent = parts.length > 2 ? '…/' + parts.slice(-2).join('/') : $('cwd').value;
   $('cwdLabel').title = $('cwd').value;
 }
