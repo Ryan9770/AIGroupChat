@@ -1,7 +1,7 @@
 import { execa } from 'execa';
 import { createInterface } from 'node:readline';
 import type { AgentAdapter } from '../adapters/types.js';
-import type { AgentEvent, ParseContext } from '../protocol/events.js';
+import { AgentEvent, type ParseContext } from '../protocol/events.js';
 import type { TaskRequest } from '../protocol/provider.js';
 
 export const DEFAULT_TIMEOUT_MS = 15 * 60_000;
@@ -49,17 +49,12 @@ export async function* runAgent(
     shell: false,
     windowsHide: true,
     // stdin을 쓰지 않을 때는 닫는다. 열어두면 claude가 파이프 입력을 3초 기다린다.
-    stdin: viaStdin ? 'pipe' : 'ignore',
+    ...(viaStdin ? { input: req.prompt } : { stdin: 'ignore' as const }),
     // 스트리밍이 목적이므로 버퍼링하지 않는다.
     buffer: false,
     timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     ...(opts.signal ? { cancelSignal: opts.signal } : {}),
   });
-
-  if (viaStdin) {
-    // 프롬프트를 넣고 곧바로 닫는다. 닫지 않으면 워커가 더 올 입력을 기다린다.
-    sub.stdin?.end(req.prompt);
-  }
 
   let stderr = '';
   sub.stderr?.on('data', (chunk: Buffer | string) => {
@@ -68,33 +63,47 @@ export async function* runAgent(
     stderr = (stderr + text).slice(-STDERR_CAP);
   });
 
-  let sawFinish = false;
+  let terminal: Extract<AgentEvent, { kind: 'session.finished' }> | undefined;
+  let streamEnded = false;
   let spawnFailure: string | undefined;
+  const completion = sub.catch((error: unknown) => {
+    spawnFailure ??= error instanceof Error ? error.message : String(error);
+    return undefined;
+  });
 
   try {
     if (sub.stdout) {
       const lines = createInterface({ input: sub.stdout, crlfDelay: Infinity });
       for await (const line of lines) {
         opts.onRawLine?.(line);
-        for (const event of adapter.parseLine(line, ctx)) {
-          if (event.kind === 'session.finished') sawFinish = true;
-          yield event;
+        let parsed: AgentEvent[];
+        try {
+          parsed = adapter.parseLine(line, ctx);
+        } catch {
+          parsed = [{ kind: 'unknown', raw: line }];
+        }
+        for (const event of parsed) {
+          const validated = AgentEvent.safeParse(event);
+          if (!validated.success) {
+            yield { kind: 'unknown', raw: event };
+          } else if (event.kind === 'session.finished') {
+            if (!terminal || event.status !== 'success') terminal = event;
+          } else {
+            yield event;
+          }
         }
       }
     }
+    streamEnded = true;
   } catch (err) {
     spawnFailure = err instanceof Error ? err.message : String(err);
   } finally {
     // 소비자가 break/return으로 빠져나갔을 수 있다. 살아 있으면 죽인다.
-    if (sub.exitCode === null && !sub.killed) sub.kill();
+    if (!streamEnded && sub.exitCode === null && !sub.killed) sub.kill();
+    await completion;
   }
 
-  const result = await sub.catch((err: unknown) => {
-    spawnFailure ??= err instanceof Error ? err.message : String(err);
-    return undefined;
-  });
-
-  if (sawFinish) return;
+  const result = await completion;
 
   // 워커가 result 이벤트를 내지 못하고 끝났다. 무슨 일이 있었는지 합성해서 알린다.
   const cancelled = opts.signal?.aborted === true || result?.isCanceled === true;
@@ -110,6 +119,11 @@ export async function* runAgent(
     return;
   }
 
+  if (terminal && exitCode === 0 && !timedOut && !spawnFailure) {
+    yield terminal;
+    return;
+  }
+
   const message =
     spawnFailure ??
     (timedOut
@@ -118,7 +132,7 @@ export async function* runAgent(
 
   yield {
     kind: 'error',
-    code: timedOut ? 'timeout' : spawnFailure ? 'spawn_failed' : `exit_${exitCode}`,
+    code: timedOut ? 'timeout' : spawnFailure ? 'spawn_failed' : exitCode === 0 ? 'missing_terminal' : `exit_${exitCode}`,
     message,
     // 타임아웃은 재시도할 만하다. 인자가 틀려서 죽은 건 재시도해도 똑같이 죽는다.
     retryable: timedOut,

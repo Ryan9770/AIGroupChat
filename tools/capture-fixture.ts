@@ -9,10 +9,21 @@
  */
 import { execa } from 'execa';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { parseArgs } from 'node:util';
 import { getAdapter, isProvider } from '../src/adapters/registry.ts';
 
-const name = process.argv[2];
-const prompt = process.argv[3] ?? 'Reply with exactly: PONG';
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    output: { type: 'string' },
+    cwd: { type: 'string' },
+    resume: { type: 'string' },
+    model: { type: 'string' },
+  },
+});
+const name = positionals[0];
+const prompt = positionals[1] ?? 'Reply with exactly: PONG';
 
 if (!name || !isProvider(name)) {
   console.error(`usage: capture-fixture <claude|antigravity|gemini|codex> [prompt]`);
@@ -20,7 +31,12 @@ if (!name || !isProvider(name)) {
 }
 
 const adapter = getAdapter(name);
-const { bin, args } = adapter.buildArgv({ prompt, mode: 'plan', cwd: process.cwd() });
+const cwd = resolve(values.cwd ?? process.cwd());
+const { bin, args, env } = adapter.buildArgv({
+  prompt, mode: 'plan', cwd,
+  ...(values.resume ? { resumeId: values.resume } : {}),
+  ...(values.model ? { model: values.model } : {}),
+});
 
 console.log(`RUN  ${bin} ${args.join(' ')}\n`);
 
@@ -29,22 +45,18 @@ const result = await execa(bin, args, {
   reject: false,
   shell: false,
   windowsHide: true,
-  stdin: 'ignore', // claude의 3초 stdin 대기 방지
+  cwd,
+  env,
+  ...(adapter.capability.promptDelivery === 'stdin' ? { input: prompt } : { stdin: 'ignore' as const }),
   timeout: 180_000,
 });
 
 const elapsed = ((Date.now() - started) / 1000).toFixed(1);
 console.log(`exit=${result.exitCode} timedOut=${result.timedOut} elapsed=${elapsed}s\n`);
 
-console.log('--- STDOUT (first 3000 chars) ---');
-console.log((result.stdout ?? '').slice(0, 3000));
-
-if (result.stderr) {
-  console.log('\n--- STDERR (first 1500 chars) ---');
-  console.log(result.stderr.slice(0, 1500));
-}
-
-await mkdir('fixtures', { recursive: true });
-const out = `fixtures/${name}.smoke.jsonl`;
-await writeFile(out, result.stdout ?? '', 'utf8');
+const out = resolve(values.output ?? `.conductor/captures/${name}-${Date.now()}.jsonl`);
+await mkdir(dirname(out), { recursive: true });
+await writeFile(out, result.stdout ?? '', { encoding: 'utf8', flag: 'wx' });
+await writeFile(`${out}.stderr`, result.stderr ?? '', { encoding: 'utf8', flag: 'wx' });
 console.log(`\nwrote ${out}`);
+process.exitCode = result.exitCode === 0 && !result.timedOut ? 0 : 1;

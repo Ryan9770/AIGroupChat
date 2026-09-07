@@ -1,0 +1,7 @@
+{"type":"init","timestamp":"2026-09-07T00:00:00.000Z","session_id":"00000000-0000-4000-8000-000000000003","model":"fixture-model"}
+{"type":"message","role":"user","content":"Read probe.txt"}
+{"type":"tool_use","tool_name":"read_file","tool_id":"read-1","parameters":{"file_path":"probe.txt"}}
+{"type":"tool_result","tool_id":"read-1","status":"success","output":"M2A_READ_OK"}
+{"type":"message","role":"assistant","content":"M2A_","delta":true}
+{"type":"message","role":"assistant","content":"READ_OK","delta":true}
+{"type":"result","status":"success","stats":{"total_tokens":42,"input_tokens":32,"output_tokens":10,"cached":12,"input":20,"duration_ms":800,"tool_calls":1,"models":{"fixture-model":{"total_tokens":42,"input_tokens":32,"output_tokens":10,"cached":12,"input":20}}}}
