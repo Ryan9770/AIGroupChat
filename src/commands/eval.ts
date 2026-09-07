@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { allAdapters } from '../adapters/registry.js';
 import { planArms } from '../eval/arms.js';
@@ -89,6 +89,16 @@ export async function evaluate(opts: EvalOptions): Promise<number> {
   const results: ArmResult[] = [];
   let index = 0;
 
+  // 🔴 실행마다 곧바로 append한다. 전부 끝난 뒤에 한 번만 쓰면 18회 중
+  //    15회째에 죽었을 때 이미 태운 쿼터가 통째로 사라진다. 두 시간짜리
+  //    실행에서 그건 받아들일 수 없는 실패 방식이다.
+  await mkdir(opts.outDir, { recursive: true });
+  const stamp = Date.now();
+  const livePath = join(opts.outDir, `eval-${stamp}.jsonl`);
+  const appendLine = (value: unknown) =>
+    appendFile(livePath, `${JSON.stringify(value)}\n`, 'utf8');
+  await appendLine({ kind: 'meta', implementer, arms, totalRuns, startedAt: stamp });
+
   try {
     for (const { task, assertPath } of tasks) {
       for (const spec of arms) {
@@ -122,6 +132,7 @@ export async function evaluate(opts: EvalOptions): Promise<number> {
             };
           }
           results.push(result);
+          await appendLine(result);
 
           const pass = `${result.score}/${result.total}`;
           process.stdout.write(
@@ -136,8 +147,7 @@ export async function evaluate(opts: EvalOptions): Promise<number> {
     process.removeListener('SIGINT', onSigint);
   }
 
-  await mkdir(opts.outDir, { recursive: true });
-  const outPath = join(opts.outDir, `eval-${Date.now()}.json`);
+  const outPath = join(opts.outDir, `eval-${stamp}.json`);
   await writeFile(outPath, JSON.stringify({ implementer, arms, results }, null, 2), 'utf8');
 
   renderSummary(results, outPath);
