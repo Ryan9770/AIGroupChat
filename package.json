@@ -13,13 +13,15 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "doctor": "tsx src/index.ts doctor",
-    "build": "tsc",
+    "build": "tsc && node tools/copy-assets.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ui": "tsx src/index.ts ui"
   },
   "dependencies": {
     "commander": "^13.1.0",
     "execa": "^9.5.2",
+    "fastify": "^5.12.3",
     "zod": "^3.24.1"
   },
   "devDependencies": {

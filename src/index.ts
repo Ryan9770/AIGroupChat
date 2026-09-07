@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { doctor } from './commands/doctor.js';
 import { planRun, planShow } from './commands/plan.js';
 import { run } from './commands/run.js';
+import { ui } from './commands/ui.js';
 import {
   workerAsk,
   workerCheck,
@@ -185,6 +186,20 @@ workspace
   .option('-f, --force', '커밋되지 않은 변경이 있어도 제거한다', false)
   .action(async (id: string, opts: { cwd: string; force: boolean }) => {
     process.exitCode = await workspaceRemove(opts.cwd, id, opts.force);
+  });
+
+program
+  .command('ui')
+  .description('로컬 웹 UI를 띄운다 (127.0.0.1 전용, 매 실행마다 새 토큰)')
+  .option('--port <n>', '포트', '7717')
+  .option('--cwd <path>', '기본 대상 폴더', process.cwd())
+  .option('--no-open', '브라우저를 자동으로 열지 않는다')
+  .action(async (opts: { port: string; cwd: string; open: boolean }) => {
+    process.exitCode = await ui({
+      port: Number(opts.port),
+      cwd: opts.cwd,
+      noOpen: opts.open === false,
+    });
   });
 
 // 워커 프로세스가 셸에서 호출하는 명령들. 사람이 직접 칠 일은 없다.

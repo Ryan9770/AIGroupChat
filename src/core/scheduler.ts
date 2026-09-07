@@ -10,6 +10,7 @@ import {
   type DispatchResult,
   type WorkspacePlan,
 } from './dispatch.js';
+import type { PendingQuestion } from '../orchestration/coordinator.js';
 import { Governor, shouldFailover } from './governor.js';
 import { route } from './router.js';
 
@@ -46,6 +47,8 @@ export interface SchedulerOptions {
   autoApprove: boolean;
   protocol: boolean;
   answerMode: 'human' | 'auto';
+  /** 질문에 답하는 경로를 갈아끼운다(웹 UI 등). */
+  askHuman?: (question: PendingQuestion) => Promise<string | null>;
   timeoutMs: number;
   signal?: AbortSignal;
   governor?: Governor;
@@ -181,6 +184,7 @@ export async function runPlan(opts: SchedulerOptions): Promise<TaskOutcome[]> {
         autoApprove: opts.autoApprove,
         protocol: opts.protocol,
         answerMode: opts.answerMode,
+        ...(opts.askHuman ? { askHuman: opts.askHuman } : {}),
         timeoutMs: opts.timeoutMs,
         runDir: opts.runDir,
         taskId: task.id,

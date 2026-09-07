@@ -15,7 +15,22 @@ export interface CoordinatorOptions {
   answerMode: 'human' | 'auto';
   /** answerMode가 'auto'일 때 보낼 답. */
   autoAnswer?: string;
+  /**
+   * 질문에 답하는 방법을 갈아끼운다.
+   *
+   * 터미널은 readline으로 묻지만, 웹 UI는 브라우저에 질문을 띄우고
+   * 사용자가 입력할 때까지 기다린다. 답을 못 받으면 null을 돌려주고,
+   * 그러면 자동 응답으로 떨어진다.
+   */
+  askHuman?: (question: PendingQuestion) => Promise<string | null>;
   pollIntervalMs?: number;
+}
+
+/** 사람에게 넘길 질문. */
+export interface PendingQuestion {
+  messageId: string;
+  question: string;
+  options: string[];
 }
 
 export interface Completion {
@@ -149,22 +164,11 @@ export class Coordinator {
       return;
     }
 
-    this.opts.render(`\n\n  ? 워커가 질문했습니다\n    ${question}\n`);
-    if (options.length > 0) {
-      this.opts.render(`    선택지: ${options.join(' / ')}\n`);
-    }
-
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    let answered: string | null;
-    try {
-      answered = (await rl.question('    답변> ')).trim();
-    } catch {
-      // stdin이 EOF에 닿았다. 답할 사람이 없다는 뜻이므로 자동 응답으로 떨어진다.
-      // 여기서 멈추면 워커가 타임아웃까지 대기하게 된다.
-      answered = null;
-    } finally {
-      rl.close();
-    }
+    // 답을 받는 경로는 갈아끼울 수 있다. 터미널은 readline, 웹 UI는 브라우저.
+    const pending: PendingQuestion = { messageId: message.id, question, options };
+    const answered = this.opts.askHuman
+      ? await this.opts.askHuman(pending)
+      : await askOnTerminal(pending, this.opts.render);
 
     const source: 'human' | 'auto' = answered === null ? 'auto' : 'human';
     // 빈 답을 그대로 보내면 워커가 해석에 곤란해진다. 명시적으로 알린다.
@@ -182,5 +186,30 @@ export class Coordinator {
       createdAt: new Date().toISOString(),
     });
     this.opts.render('\n');
+  }
+}
+
+/**
+ * 터미널에서 사람에게 묻는다. 기본 동작.
+ *
+ * stdin이 EOF면 null을 돌려준다 — 답할 사람이 없다는 뜻이고,
+ * 여기서 멈추면 워커가 타임아웃까지 대기하게 된다.
+ */
+async function askOnTerminal(
+  pending: PendingQuestion,
+  render: (text: string) => void,
+): Promise<string | null> {
+  render(`\n\n  ? 워커가 질문했습니다\n    ${pending.question}\n`);
+  if (pending.options.length > 0) {
+    render(`    선택지: ${pending.options.join(' / ')}\n`);
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await rl.question('    답변> ')).trim();
+  } catch {
+    return null;
+  } finally {
+    rl.close();
   }
 }

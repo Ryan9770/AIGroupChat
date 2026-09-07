@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>conductor</title>
+<style>
+:root{
+  --bg:#fbfbfa; --panel:#fff; --line:#e3e2df; --ink:#1f1e1c; --muted:#6f6d68;
+  --accent:#3b6ea5; --ok:#2f7d4f; --warn:#96690d; --bad:#b03a2e; --code:#f4f3f0;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#191817; --panel:#212020; --line:#343331; --ink:#eceae6; --muted:#9a9791;
+    --accent:#7aa7d6; --ok:#69b088; --warn:#d3a545; --bad:#e08272; --code:#1a1918;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
+header{display:flex;align-items:baseline;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line)}
+header h1{font-size:15px;margin:0;letter-spacing:.02em}
+header .sub{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0}
+header #cwdLabel{flex:1}
+header #conn{flex:none}
+nav{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);
+  padding:10px 14px;font:inherit;cursor:pointer}
+nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+main{padding:22px;max-width:1180px}
+section[hidden]{display:none}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+  margin:0 0 10px;font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+.grid{display:grid;gap:12px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;
+  background:var(--bg);color:var(--ink);font:inherit}
+textarea{resize:vertical;min-height:88px}
+button.act{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 16px;
+  font:inherit;cursor:pointer}
+button.act:disabled{opacity:.45;cursor:default}
+button.ghost{background:none;border:1px solid var(--line);border-radius:6px;padding:6px 12px;
+  color:var(--ink);font:inherit;cursor:pointer}
+button.danger{border-color:var(--bad);color:var(--bad)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+td .row{flex-wrap:nowrap}
+th,td{white-space:nowrap}
+td.wrap{white-space:normal}
+.checks{display:flex;gap:16px;flex-wrap:wrap}
+.checks label{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px;margin:0}
+.checks input{width:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
+  letter-spacing:.06em;padding:6px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;border:1px solid var(--line)}
+.ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)} .muted{color:var(--muted)}
+pre.stream{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px;
+  max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:12.5px;margin:0}
+pre.diff{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px;
+  max-height:520px;overflow:auto;font-size:12.5px;margin:0}
+.diff .add{color:var(--ok)} .diff .del{color:var(--bad)} .diff .hd{color:var(--accent)}
+.ask{border:1px solid var(--accent);border-radius:8px;padding:14px;margin-bottom:14px;background:var(--panel)}
+.ask .q{margin-bottom:10px}
+.opts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.empty{color:var(--muted);padding:18px 0}
+.task{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin-bottom:10px}
+.task.run{border-left-color:var(--accent)}
+.task.ok{border-left-color:var(--ok)}
+.task.bad{border-left-color:var(--bad)}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>conductor</h1>
+  <span class="sub" id="cwdLabel"></span>
+  <span class="sub" id="conn"></span>
+</header>
+
+<nav>
+  <button data-tab="status" aria-selected="true">현황</button>
+  <button data-tab="run" aria-selected="false">실행</button>
+  <button data-tab="plan" aria-selected="false">계획</button>
+  <button data-tab="ws" aria-selected="false">작업 공간</button>
+</nav>
+
+<main>
+  <!-- ── 현황 ─────────────────────────────────────────────── -->
+  <section id="tab-status">
+    <div class="card">
+      <h2>Provider</h2>
+      <table><thead><tr>
+        <th>PROVIDER</th><th>버전</th><th>로그인</th><th>정보</th><th>쿼터</th>
+      </tr></thead><tbody id="provRows"></tbody></table>
+      <div class="hint" id="provNotes"></div>
+    </div>
+    <div class="card">
+      <h2>대상 폴더</h2>
+      <input id="cwd" spellcheck="false">
+      <div class="hint">git 저장소여야 작업 공간 격리를 쓸 수 있습니다. 커밋이 최소 하나 필요합니다.</div>
+    </div>
+  </section>
+
+  <!-- ── 실행 ─────────────────────────────────────────────── -->
+  <section id="tab-run" hidden>
+    <div class="card">
+      <h2>단일 실행</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+        <div><label>에이전트</label><select id="runAgent"></select></div>
+        <div><label>모드</label><select id="runMode">
+          <option value="plan">plan — 읽기 전용</option>
+          <option value="write">write — 파일 수정</option>
+        </select></div>
+        <div><label>모델 (선택)</label><input id="runModel" placeholder="예: gpt-5.4-mini" spellcheck="false"></div>
+      </div>
+      <div style="margin-top:12px"><label>지시</label>
+        <textarea id="runPrompt" placeholder="이 프로젝트가 무슨 일을 하는지 3문장으로 설명하라"></textarea></div>
+      <div class="checks" style="margin:12px 0">
+        <label><input type="checkbox" id="runWs" checked> 작업 공간 격리</label>
+        <label><input type="checkbox" id="runYolo"> 도구 자동 승인 (yolo)</label>
+        <label><input type="checkbox" id="runProto" checked> 되묻기 허용</label>
+      </div>
+      <div class="row">
+        <button class="act" id="runGo">실행</button>
+        <button class="ghost" id="runStop" disabled>중단</button>
+        <span class="muted" id="runMeta"></span>
+      </div>
+      <div class="hint" id="runWarn"></div>
+    </div>
+    <div id="runAsk"></div>
+    <div class="card"><h2>출력</h2><pre class="stream" id="runOut"></pre></div>
+    <div class="card" id="runResult" hidden><h2>결과</h2><div id="runResultBody"></div></div>
+  </section>
+
+  <!-- ── 계획 ─────────────────────────────────────────────── -->
+  <section id="tab-plan" hidden>
+    <div class="card">
+      <h2>Task</h2>
+      <div id="taskList"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" id="addTask">+ Task 추가</button>
+        <button class="ghost" id="loadSample">예시 불러오기</button>
+      </div>
+      <div style="margin-top:14px"><label>목표</label><input id="planObjective" spellcheck="false"></div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <button class="ghost" id="planPreview">배정 미리보기</button>
+        <button class="act" id="planGo">계획 실행</button>
+        <button class="ghost" id="planStop" disabled>중단</button>
+        <label style="margin:0;display:flex;align-items:center;gap:6px;color:var(--ink)">
+          <input type="checkbox" id="planYolo" style="width:auto"> yolo</label>
+        <span style="width:150px"><input id="planBudget" placeholder="예산 $ (선택)"></span>
+      </div>
+      <div id="planPreviewOut" style="margin-top:12px"></div>
+    </div>
+    <div id="planAsk"></div>
+    <div class="card"><h2>진행</h2><div id="planTasks"></div><pre class="stream" id="planOut" style="margin-top:12px"></pre></div>
+    <div class="card" id="planResult" hidden><h2>결과</h2><div id="planResultBody"></div></div>
+  </section>
+
+  <!-- ── 작업 공간 ─────────────────────────────────────────── -->
+  <section id="tab-ws" hidden>
+    <div class="card">
+      <div class="row"><h2 style="margin:0;flex:1">작업 공간</h2>
+        <button class="ghost" id="wsRefresh">새로고침</button></div>
+      <table><thead><tr><th>ID</th><th>브랜치</th><th>변경</th><th></th></tr></thead>
+        <tbody id="wsRows"></tbody></table>
+      <div class="empty" id="wsEmpty" hidden>conductor가 만든 작업 공간이 없습니다.</div>
+    </div>
+    <div class="card" id="wsDiffCard" hidden>
+      <div class="row"><h2 style="margin:0;flex:1" id="wsDiffTitle">변경 내용</h2>
+        <button class="ghost" id="wsDiffClose">닫기</button></div>
+      <pre class="diff" id="wsDiff"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+const token = location.hash.slice(1);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: { 'content-type': 'application/json', 'x-conductor-token': token, ...(options.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data, status: res.status });
+  return data;
+}
+
+/* ── 탭 ─────────────────────────────────────────────────── */
+document.querySelectorAll('nav button').forEach((btn) => {
+  btn.onclick = () => {
+    document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+    for (const name of ['status', 'run', 'plan', 'ws']) $('tab-' + name).hidden = name !== btn.dataset.tab;
+    if (btn.dataset.tab === 'ws') loadWorkspaces();
+  };
+});
+
+/* ── 현황 ───────────────────────────────────────────────── */
+let providers = [];
+async function loadStatus() {
+  try {
+    const data = await api('/api/status');
+    providers = data.providers;
+    $('cwd').value = $('cwd').value || data.defaultCwd;
+    setCwdLabel();
+
+    $('provRows').innerHTML = providers.map((p) => {
+      const auth = p.authed === true ? '<span class="ok">OK</span>'
+        : p.authed === false ? '<span class="bad">안 됨</span>'
+        : '<span class="warn">미확인</span>';
+      const q = !p.availability.usable ? `<span class="bad">${esc(p.availability.reason || '차단')}</span>`
+        : p.availability.strained ? `<span class="warn">${esc(p.availability.reason || '')}</span>`
+        : '<span class="muted">여유</span>';
+      return `<tr><td><b>${esc(p.provider)}</b> <span class="muted mono">${esc(p.bin)}</span></td>
+        <td class="mono">${p.installed ? esc(p.version || '?') : '<span class="bad">미설치</span>'}</td>
+        <td>${auth}</td><td class="muted">${esc(p.summary || '-')}</td><td>${q}</td></tr>`;
+    }).join('');
+
+    $('provNotes').innerHTML = providers.flatMap((p) => p.notes.map((n) => `· <b>${esc(p.provider)}</b> ${esc(n)}`)).join('<br>');
+
+    const usable = providers.filter((p) => p.installed && p.authed === true);
+    $('runAgent').innerHTML = usable.map((p) => `<option value="${esc(p.provider)}">${esc(p.provider)}</option>`).join('');
+    $('conn').textContent = `${usable.length}/${providers.length} 사용 가능`;
+  } catch (err) {
+    $('conn').innerHTML = `<span class="bad">연결 실패 — 토큰이 포함된 주소로 접속했는지 확인하세요</span>`;
+  }
+}
+function setCwdLabel() {
+  // 전체 경로는 길어서 헤더를 밀어낸다. 뒤쪽 두 조각만 보여준다.
+  const parts = $('cwd').value.replace(/\/g, '/').split('/').filter(Boolean);
+  $('cwdLabel').textContent = parts.length > 2 ? '…/' + parts.slice(-2).join('/') : $('cwd').value;
+  $('cwdLabel').title = $('cwd').value;
+}
+$('cwd').addEventListener('change', () => { setCwdLabel(); loadWorkspaces(); });
+
+/* ── 실행 스트림 공용 ────────────────────────────────────── */
+function stream(runId, { out, onEvent, onDone }) {
+  const source = new EventSource(`/api/events/${runId}?token=${encodeURIComponent(token)}`);
+  source.onmessage = (message) => {
+    const event = JSON.parse(message.data);
+    if (event.type === 'log' && out) { out.textContent += event.text; out.scrollTop = out.scrollHeight; }
+    onEvent?.(event);
+    if (event.type === 'done' || event.type === 'error') {
+      if (event.type === 'done') { source.close(); onDone?.(event); }
+    }
+  };
+  source.onerror = () => source.close();
+  return source;
+}
+
+function renderAsk(container, runId, event) {
+  const box = document.createElement('div');
+  box.className = 'ask';
+  box.id = 'ask-' + event.questionId;
+  box.innerHTML = `<div class="q"><b>워커가 질문했습니다</b><br>${esc(event.question)}</div>
+    <div class="opts">${(event.options || []).map((o) => `<button class="ghost opt">${esc(o)}</button>`).join('')}</div>
+    <div class="row"><input class="ans" placeholder="답변을 입력하세요" style="flex:1">
+    <button class="act send">보내기</button></div>`;
+  container.appendChild(box);
+
+  const input = box.querySelector('.ans');
+  const send = async (value) => {
+    box.querySelectorAll('button,input').forEach((el) => (el.disabled = true));
+    await api('/api/answer', { method: 'POST', body: JSON.stringify({ runId, questionId: event.questionId, body: value }) });
+    box.innerHTML = `<div class="muted">답변함: ${esc(value)}</div>`;
+  };
+  box.querySelectorAll('.opt').forEach((b) => (b.onclick = () => send(b.textContent)));
+  box.querySelector('.send').onclick = () => send(input.value);
+  input.onkeydown = (e) => { if (e.key === 'Enter') send(input.value); };
+  input.focus();
+}
+
+/* ── 단일 실행 ──────────────────────────────────────────── */
+let runSource = null, runId = null;
+function syncRunWarn() {
+  const yolo = $('runYolo').checked, ws = $('runWs').checked;
+  $('runWarn').innerHTML = yolo && !ws
+    ? '<span class="bad">⚠ 작업 공간 격리 없이 도구를 자동 승인하면 워커가 원본 폴더를 바로 수정합니다.</span>'
+    : '';
+}
+$('runYolo').onchange = syncRunWarn; $('runWs').onchange = syncRunWarn;
+
+$('runGo').onclick = async () => {
+  $('runOut').textContent = ''; $('runAsk').innerHTML = '';
+  $('runResult').hidden = true; $('runMeta').textContent = '';
+  $('runGo').disabled = true; $('runStop').disabled = false;
+  try {
+    const body = {
+      agent: $('runAgent').value, prompt: $('runPrompt').value, cwd: $('cwd').value,
+      mode: $('runMode').value, workspace: $('runWs').checked,
+      yolo: $('runYolo').checked, protocol: $('runProto').checked,
+    };
+    if ($('runModel').value.trim()) body.model = $('runModel').value.trim();
+    const { runId: id } = await api('/api/run', { method: 'POST', body: JSON.stringify(body) });
+    runId = id;
+    runSource = stream(id, {
+      out: $('runOut'),
+      onEvent: (e) => {
+        if (e.type === 'question') renderAsk($('runAsk'), id, e);
+        if (e.type === 'usage') $('runMeta').textContent =
+          `in ${e.inputTokens} · out ${e.outputTokens}` + (e.costUsd != null ? ` · $${e.costUsd.toFixed(4)}` : '');
+        if (e.type === 'error') $('runOut').textContent += `\n✗ ${e.message}\n`;
+      },
+      onDone: (e) => {
+        $('runGo').disabled = false; $('runStop').disabled = true;
+        const s = e.summary || {};
+        $('runResult').hidden = false;
+        $('runResultBody').innerHTML = s.error
+          ? `<span class="bad">${esc(s.error)}</span>`
+          : `<div class="${e.ok ? 'ok' : 'bad'}"><b>${esc(s.outcome || (e.ok ? 'succeeded' : 'failed'))}</b></div>
+             <div style="margin-top:8px">${esc(s.report || '')}</div>
+             ${(s.filesChanged || []).length ? `<div style="margin-top:8px" class="muted">변경: ${s.filesChanged.map(esc).join(', ')}</div>` : ''}
+             ${s.workspace ? `<div class="hint">작업 공간 <b>${esc(s.workspace.id)}</b> — 작업 공간 탭에서 diff를 볼 수 있습니다.</div>` : ''}`;
+        loadStatus();
+      },
+    });
+  } catch (err) {
+    $('runOut').textContent = '✗ ' + err.message;
+    $('runGo').disabled = false; $('runStop').disabled = true;
+  }
+};
+$('runStop').onclick = () => api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId }) });
+
+/* ── 계획 ───────────────────────────────────────────────── */
+let tasks = [];
+const SAMPLE = {
+  objective: 'README에 설치 안내 섹션 추가',
+  tasks: [
+    { id: 'design', role: 'design', spec: '저장소를 살펴보고 README에 추가할 설치 섹션 내용을 설계하라. 파일은 수정하지 마라.', dependsOn: [], context: [], workspace: 'none' },
+    { id: 'implement', role: 'implement', spec: 'README.md에 설치 섹션을 추가하라. 참고 자료의 설계를 따르되 저장소 실내용을 우선하라.', dependsOn: ['design'], context: ['design'], workspace: 'new' },
+    { id: 'review', role: 'review', spec: 'git diff HEAD를 검토하고 저장소 실내용과 어긋나는 부분을 나열하라. 파일은 수정하지 마라.', dependsOn: ['implement'], context: ['design', 'implement'], workspace: 'inherit:implement' },
+  ],
+};
+
+function renderTasks() {
+  $('taskList').innerHTML = tasks.map((t, i) => `
+    <div class="card" style="margin-bottom:10px;padding:12px">
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div><label>ID</label><input data-i="${i}" data-k="id" value="${esc(t.id)}"></div>
+        <div><label>역할</label><select data-i="${i}" data-k="role">
+          ${['design','implement','review','custom'].map((r) => `<option ${t.role===r?'selected':''}>${r}</option>`).join('')}
+        </select></div>
+        <div><label>의존 (쉼표)</label><input data-i="${i}" data-k="dependsOn" value="${esc((t.dependsOn||[]).join(','))}"></div>
+        <div><label>참고 자료 (쉼표)</label><input data-i="${i}" data-k="context" value="${esc((t.context||[]).join(','))}"></div>
+        <div style="align-self:end"><button class="ghost danger" data-del="${i}">삭제</button></div>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:8px">
+        <div><label>작업 공간</label><input data-i="${i}" data-k="workspace" value="${esc(t.workspace||'none')}" placeholder="none | new | inherit:taskId"></div>
+        <div><label>codex 모델 (선택)</label><input data-i="${i}" data-k="codexModel" value="${esc(t.models?.codex||'')}" placeholder="gpt-5.4-mini"></div>
+      </div>
+      <div style="margin-top:8px"><label>지시</label><textarea data-i="${i}" data-k="spec" style="min-height:60px">${esc(t.spec)}</textarea></div>
+    </div>`).join('');
+
+  $('taskList').querySelectorAll('[data-k]').forEach((el) => {
+    el.onchange = () => {
+      const t = tasks[+el.dataset.i], k = el.dataset.k;
+      if (k === 'dependsOn' || k === 'context') t[k] = el.value.split(',').map((s) => s.trim()).filter(Boolean);
+      else if (k === 'codexModel') { t.models = el.value.trim() ? { codex: el.value.trim() } : undefined; }
+      else t[k] = el.value;
+    };
+  });
+  $('taskList').querySelectorAll('[data-del]').forEach((b) => {
+    b.onclick = () => { tasks.splice(+b.dataset.del, 1); renderTasks(); };
+  });
+}
+$('addTask').onclick = () => {
+  tasks.push({ id: 'task' + (tasks.length + 1), role: 'custom', spec: '', dependsOn: [], context: [], workspace: 'none' });
+  renderTasks();
+};
+$('loadSample').onclick = () => {
+  $('planObjective').value = SAMPLE.objective;
+  tasks = JSON.parse(JSON.stringify(SAMPLE.tasks));
+  renderTasks();
+};
+
+const currentPlan = () => ({
+  objective: $('planObjective').value || '(목표 없음)',
+  tasks: tasks.map((t) => ({ ...t, models: t.models || undefined })),
+});
+
+$('planPreview').onclick = async () => {
+  try {
+    const data = await api('/api/plan/preview', { method: 'POST', body: JSON.stringify({ plan: currentPlan() }) });
+    const issues = data.issues.length
+      ? `<div class="bad" style="margin-bottom:8px">${data.issues.map((i) => `· ${esc(i.taskId)}: ${esc(i.message)}`).join('<br>')}</div>` : '';
+    $('planPreviewOut').innerHTML = issues + `<table><thead><tr>
+      <th>TASK</th><th>역할</th><th>의존</th><th>작업 공간</th><th>PROVIDER</th><th>대체</th></tr></thead><tbody>
+      ${data.tasks.map((t) => `<tr><td>${esc(t.id)}</td><td>${esc(t.role)}</td>
+        <td class="muted">${esc(t.dependsOn.join(',') || '-')}</td><td class="mono">${esc(t.workspace)}</td>
+        <td>${t.provider ? `<b>${esc(t.provider)}</b>` : '<span class="bad">없음</span>'}</td>
+        <td class="muted">${esc(t.fallbacks.join(',') || '-')}</td></tr>`).join('')}
+      </tbody></table>`;
+  } catch (err) {
+    $('planPreviewOut').innerHTML = `<span class="bad">${esc(err.message)}</span>` +
+      (err.data?.issues ? `<br>${err.data.issues.map((i) => `· ${esc(i.path)}: ${esc(i.message)}`).join('<br>')}` : '');
+  }
+};
+
+let planRunId = null;
+$('planGo').onclick = async () => {
+  $('planOut').textContent = ''; $('planTasks').innerHTML = ''; $('planAsk').innerHTML = '';
+  $('planResult').hidden = true; $('planGo').disabled = true; $('planStop').disabled = false;
+  try {
+    const body = { plan: currentPlan(), cwd: $('cwd').value, yolo: $('planYolo').checked };
+    if ($('planBudget').value) body.budgetUsd = Number($('planBudget').value);
+    const { runId: id } = await api('/api/plan/run', { method: 'POST', body: JSON.stringify(body) });
+    planRunId = id;
+    const seen = {};
+    stream(id, {
+      out: $('planOut'),
+      onEvent: (e) => {
+        if (e.type === 'question') renderAsk($('planAsk'), id, e);
+        if (e.type === 'task.start') {
+          seen[e.taskId] = document.createElement('div');
+          seen[e.taskId].className = 'task run';
+          seen[e.taskId].innerHTML = `<b>${esc(e.taskId)}</b> → ${esc(e.provider)} <span class="muted">실행 중…</span>`;
+          $('planTasks').appendChild(seen[e.taskId]);
+        }
+        if (e.type === 'failover') {
+          $('planOut').textContent += `\n↻ ${e.from} → ${e.to} (${e.reason}) — 같은 Task의 새 시도\n`;
+        }
+        if (e.type === 'task.end' && seen[e.taskId]) {
+          const good = e.state === 'succeeded';
+          seen[e.taskId].className = 'task ' + (good ? 'ok' : 'bad');
+          seen[e.taskId].innerHTML = `<b>${esc(e.taskId)}</b> <span class="${good ? 'ok' : 'bad'}">${esc(e.state)}</span>` +
+            (e.files ? ` <span class="muted">files ${e.files}</span>` : '') +
+            (e.note ? `<div class="muted" style="font-size:12.5px">${esc(e.note)}</div>` : '');
+        }
+        if (e.type === 'error') $('planOut').textContent += `\n✗ ${e.message}\n`;
+      },
+      onDone: (e) => {
+        $('planGo').disabled = false; $('planStop').disabled = true;
+        const s = e.summary || {};
+        $('planResult').hidden = false;
+        $('planResultBody').innerHTML = s.error ? `<span class="bad">${esc(s.error)}</span>` : `
+          <table><thead><tr><th>TASK</th><th>PROVIDER</th><th>상태</th><th>변경</th><th>작업 공간</th></tr></thead><tbody>
+          ${(s.tasks || []).map((t) => `<tr><td>${esc(t.taskId)}</td><td>${esc(t.provider || '-')}</td>
+            <td class="${t.state === 'succeeded' ? 'ok' : 'bad'}">${esc(t.state)}</td>
+            <td>${t.files.length}</td><td class="mono">${esc(t.workspace || '-')}</td></tr>`).join('')}
+          </tbody></table>
+          ${(s.tasks || []).some((t) => t.attempts?.length > 1)
+            ? `<div class="hint">재배치: ${(s.tasks || []).filter((t) => t.attempts?.length > 1)
+                .map((t) => `${esc(t.taskId)} ${t.attempts.map((a) => `${a.provider}${a.failoverReason ? `(${a.failoverReason})` : ''}`).join(' → ')}`).join(' / ')}</div>` : ''}
+          ${s.costUsd ? `<div class="hint">비용 $${s.costUsd.toFixed(4)}</div>` : ''}`;
+        loadStatus(); loadWorkspaces();
+      },
+    });
+  } catch (err) {
+    $('planOut').textContent = '✗ ' + err.message;
+    $('planGo').disabled = false; $('planStop').disabled = true;
+  }
+};
+$('planStop').onclick = () => api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId: planRunId }) });
+
+/* ── 작업 공간 ──────────────────────────────────────────── */
+async function loadWorkspaces() {
+  try {
+    const data = await api('/api/workspaces?cwd=' + encodeURIComponent($('cwd').value));
+    $('wsEmpty').hidden = data.workspaces.length > 0;
+    $('wsRows').innerHTML = data.workspaces.map((w) => `<tr>
+      <td class="mono">${esc(w.id)}</td><td class="mono muted">${esc(w.branch)}</td>
+      <td>${w.changes.files.length ? `<span class="ok">${w.changes.files.length}</span>` : '<span class="muted">0</span>'}</td>
+      <td class="row" style="gap:6px">
+        <button class="ghost" data-diff="${esc(w.id)}">변경 보기</button>
+        <button class="ghost danger" data-rm="${esc(w.id)}">삭제</button></td></tr>`).join('');
+
+    $('wsRows').querySelectorAll('[data-diff]').forEach((b) => (b.onclick = () => showDiff(b.dataset.diff)));
+    $('wsRows').querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => removeWs(b.dataset.rm, false)));
+  } catch (err) {
+    $('wsRows').innerHTML = `<tr><td colspan="4" class="bad">${esc(err.message)}</td></tr>`;
+  }
+}
+async function showDiff(id) {
+  const data = await api(`/api/diff?cwd=${encodeURIComponent($('cwd').value)}&id=${encodeURIComponent(id)}`);
+  $('wsDiffCard').hidden = false;
+  $('wsDiffTitle').textContent = `${id} — ${data.branch}`;
+  $('wsDiff').innerHTML = (data.diff || '(변경 없음)').split('\n').map((line) => {
+    const cls = line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@') ? 'hd'
+      : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : '';
+    return cls ? `<span class="${cls}">${esc(line)}</span>` : esc(line);
+  }).join('\n');
+}
+async function removeWs(id, force) {
+  try {
+    await api('/api/workspaces/remove', { method: 'POST', body: JSON.stringify({ cwd: $('cwd').value, id, force }) });
+    $('wsDiffCard').hidden = true;
+    loadWorkspaces();
+  } catch (err) {
+    if (err.status === 409) {
+      // 워커의 작업물을 말없이 날리지 않는다. 무엇을 지우는지 보여주고 확인받는다.
+      if (confirm(`커밋되지 않은 변경 ${err.data.files.length}개가 있습니다:\n\n${err.data.files.slice(0, 10).join('\n')}\n\n그래도 삭제할까요?`)) {
+        removeWs(id, true);
+      }
+    } else alert(err.message);
+  }
+}
+$('wsRefresh').onclick = loadWorkspaces;
+$('wsDiffClose').onclick = () => ($('wsDiffCard').hidden = true);
+
+/* ── 시작 ───────────────────────────────────────────────── */
+syncRunWarn();
+loadStatus();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { getAdapter } from '../adapters/registry.js';
-import { Coordinator } from '../orchestration/coordinator.js';
+import { Coordinator, type PendingQuestion } from '../orchestration/coordinator.js';
 import { writeConductorShim } from '../orchestration/shim.js';
 import type { AgentEvent } from '../protocol/events.js';
 import {
@@ -54,6 +54,8 @@ export interface DispatchRequest {
   autoApprove: boolean;
   protocol: boolean;
   answerMode: 'human' | 'auto';
+  /** 질문에 답하는 경로를 갈아끼운다(웹 UI 등). 없으면 터미널에서 묻는다. */
+  askHuman?: (question: PendingQuestion) => Promise<string | null>;
   timeoutMs: number;
   /** 계획 실행 시 여러 Task가 같은 run 디렉토리를 공유한다. */
   runDir?: string;
@@ -169,6 +171,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
       dispatchId,
       render: (text) => notice(text.trim()),
       answerMode: request.answerMode,
+      ...(request.askHuman ? { askHuman: request.askHuman } : {}),
     });
     coordinator.start();
   }
