@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MAISON ÉLAN - 감각적인 일상을 위한 프리미엄 라이프스타일 큐레이션 쇼핑몰">
+  <title>MAISON ÉLAN | Elevate Your Everyday</title>
+
+  <!-- Pretendard & Cormorant Garamond Web Fonts -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top Announcement Bar (Subtle Luxury Notice) -->
+  <aside class="top-bar">
+    <div class="container top-bar__inner">
+      <p class="top-bar__text">Complimentary Shipping & Signature Gift Packaging on All Orders Over ₩150,000</p>
+    </div>
+  </aside>
+
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="container header__inner">
+      <!-- Mobile Hamburger Button -->
+      <button class="menu-btn" id="menuBtn" aria-label="메뉴 열기" aria-expanded="false" aria-controls="mobileNav">
+        <span class="menu-btn__line"></span>
+        <span class="menu-btn__line"></span>
+        <span class="menu-btn__line"></span>
+      </button>
+
+      <!-- Brand Logo -->
+      <a href="#" class="brand-logo" aria-label="MAISON ÉLAN 홈">
+        <span class="brand-logo__main">MAISON ÉLAN</span>
+        <span class="brand-logo__sub">ATELIER DE SÉLECTION</span>
+      </a>
+
+      <!-- Desktop Navigation Menu -->
+      <nav class="nav" aria-label="메인 내비게이션">
+        <ul class="nav__list">
+          <li class="nav__item"><a href="#new" class="nav__link">New Arrivals</a></li>
+          <li class="nav__item"><a href="#best" class="nav__link">Best Sellers</a></li>
+          <li class="nav__item"><a href="#collection" class="nav__link">Collection</a></li>
+          <li class="nav__item"><a href="#about" class="nav__link">About Maison</a></li>
+        </ul>
+      </nav>
+
+      <!-- Utility Actions (Search, Cart, Sign In) -->
+      <div class="header-actions">
+        <!-- Search Button -->
+        <button class="action-btn" id="searchOpenBtn" aria-label="검색창 열기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+
+        <!-- Cart Button -->
+        <button class="action-btn cart-btn" id="cartOpenBtn" aria-label="장바구니 열기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+          <span class="cart-badge" id="cartBadge">0</span>
+        </button>
+
+        <!-- Login Button -->
+        <a href="#login" class="login-btn" id="loginBtn">Sign In</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Drawer Navigation -->
+  <div class="mobile-drawer" id="mobileDrawer" aria-hidden="true">
+    <div class="mobile-drawer__overlay" id="drawerOverlay"></div>
+    <div class="mobile-drawer__panel" id="mobileNav">
+      <div class="mobile-drawer__header">
+        <span class="mobile-drawer__logo">MAISON ÉLAN</span>
+        <button class="mobile-drawer__close" id="drawerCloseBtn" aria-label="메뉴 닫기">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <nav class="mobile-drawer__nav">
+        <ul>
+          <li><a href="#new" class="mobile-nav-link">New Arrivals <span>01</span></a></li>
+          <li><a href="#best" class="mobile-nav-link">Best Sellers <span>02</span></a></li>
+          <li><a href="#collection" class="mobile-nav-link">Collection <span>03</span></a></li>
+          <li><a href="#about" class="mobile-nav-link">About Maison <span>04</span></a></li>
+          <li><a href="#reviews" class="mobile-nav-link">Reviews <span>05</span></a></li>
+          <li><a href="#newsletter" class="mobile-nav-link">Newsletter <span>06</span></a></li>
+        </ul>
+      </nav>
+      <div class="mobile-drawer__footer">
+        <a href="#login" class="btn btn--outline btn--full">Sign In / Register</a>
+        <div class="mobile-drawer__contact">
+          <p>고객지원: 1688-0000</p>
+          <p>concierge@maisonelan.com</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Modal Overlay -->
+  <div class="search-modal" id="searchModal" aria-hidden="true">
+    <div class="search-modal__overlay" id="searchOverlay"></div>
+    <div class="search-modal__dialog">
+      <div class="search-modal__head">
+        <div class="search-input-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="원하시는 아이템 또는 컬렉션을 검색해보세요..." autocomplete="off">
+        </div>
+        <button class="search-modal__close" id="searchCloseBtn" aria-label="검색창 닫기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="search-modal__recommend">
+        <span class="recommend-title">추천 검색어</span>
+        <div class="recommend-tags">
+          <button type="button" class="tag-btn">캐시미어 니트</button>
+          <button type="button" class="tag-btn">세라믹 오브제</button>
+          <button type="button" class="tag-btn">보태니컬 디퓨저</button>
+          <button type="button" class="tag-btn">가죽 카드지갑</button>
+          <button type="button" class="tag-btn">2026 Spring Collection</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main id="mainContent">
+    <!-- 2. Main Hero Section -->
+    <section class="hero" id="hero">
+      <div class="hero__backdrop" style="background-image: url('https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1920&q=85');">
+        <div class="hero__overlay"></div>
+      </div>
+      <div class="container hero__container">
+        <div class="hero__content reveal">
+          <div class="hero__badge">
+            <span class="hero__badge-dot"></span>
+            <span>2026 Curated Selection</span>
+          </div>
+          <h1 class="hero__title">
+            Elevate Your<br>
+            <em>Everyday</em>
+          </h1>
+          <p class="hero__subtitle">
+            감각적인 일상을 위한 프리미엄 셀렉션.<br class="mobile-only">
+            유행을 초월하는 절제된 미학과 지속 가능한 가치를 제안합니다.
+          </p>
+          <div class="hero__actions">
+            <a href="#best" class="btn btn--primary">
+              <span>Shop Now</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </a>
+            <a href="#collection" class="btn btn--ghost">
+              <span>Explore Collection</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Floating Hero Detail Card -->
+        <div class="hero__featured-card reveal reveal--delay-1">
+          <div class="featured-card__thumb" style="background-image: url('https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=600&q=80');"></div>
+          <div class="featured-card__info">
+            <span class="featured-card__tag">Featured Atelier</span>
+            <h2 class="featured-card__name">Botanical Eau De Parfum</h2>
+            <p class="featured-card__meta">Cedar & Amber White · 50ml</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scroll Indicator -->
+      <a href="#collection" class="hero__scroll-down" aria-label="아래 섹션으로 스크롤">
+        <span class="scroll-text">SCROLL</span>
+        <span class="scroll-line"></span>
+      </a>
+    </section>
+
+    <!-- 3. Category Section -->
+    <section class="categories section-py" id="collection">
+      <div class="container">
+        <div class="section-head text-center reveal">
+          <span class="section-subtitle">Curated Categories</span>
+          <h2 class="section-title">Collections of Refined Taste</h2>
+          <p class="section-desc">일상의 품격을 높여주는 네 가지 라이프스타일 카테고리를 만나보세요.</p>
+        </div>
+
+        <div class="category-grid">
+          <!-- Category 1: Apparel -->
+          <article class="category-card reveal">
+            <a href="#best" class="category-card__link">
+              <div class="category-card__media">
+                <img src="https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=800&q=80" alt="Apparel Collection" loading="lazy">
+                <div class="category-card__overlay"></div>
+              </div>
+              <div class="category-card__content">
+                <span class="category-card__num">01</span>
+                <h3 class="category-card__title">Apparel</h3>
+                <p class="category-card__desc">엄선된 오가닉 패브릭과 절제된 테일러링이 선사하는 우아한 실루엣</p>
+                <span class="category-card__cta">
+                  <span>View Details</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </a>
+          </article>
+
+          <!-- Category 2: Beauty -->
+          <article class="category-card reveal reveal--delay-1">
+            <a href="#best" class="category-card__link">
+              <div class="category-card__media">
+                <img src="https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=800&q=80" alt="Beauty Collection" loading="lazy">
+                <div class="category-card__overlay"></div>
+              </div>
+              <div class="category-card__content">
+                <span class="category-card__num">02</span>
+                <h3 class="category-card__title">Beauty & Scent</h3>
+                <p class="category-card__desc">자연 유래 성분과 시그니처 조향으로 완성하는 고요한 리추얼</p>
+                <span class="category-card__cta">
+                  <span>View Details</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </a>
+          </article>
+
+          <!-- Category 3: Living -->
+          <article class="category-card reveal reveal--delay-2">
+            <a href="#best" class="category-card__link">
+              <div class="category-card__media">
+                <img src="https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80" alt="Living Collection" loading="lazy">
+                <div class="category-card__overlay"></div>
+              </div>
+              <div class="category-card__content">
+                <span class="category-card__num">03</span>
+                <h3 class="category-card__title">Living & Objet</h3>
+                <p class="category-card__desc">공간의 온도를 부드럽게 바꾸는 도예 장인의 수공예 세라믹</p>
+                <span class="category-card__cta">
+                  <span>View Details</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </a>
+          </article>
+
+          <!-- Category 4: Accessories -->
+          <article class="category-card reveal reveal--delay-3">
+            <a href="#best" class="category-card__link">
+              <div class="category-card__media">
+                <img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=800&q=80" alt="Accessories Collection" loading="lazy">
+                <div class="category-card__overlay"></div>
+              </div>
+              <div class="category-card__content">
+                <span class="category-card__num">04</span>
+                <h3 class="category-card__title">Accessories</h3>
+                <p class="category-card__desc">시간이 흐를수록 깊어지는 천연 가죽과 스털링 실버 오브제</p>
+                <span class="category-card__cta">
+                  <span>View Details</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Best Sellers Section -->
+    <section class="products section-py bg-secondary" id="best">
+      <div class="container">
+        <div class="section-head-row reveal">
+          <div>
+            <span class="section-subtitle">Timeless Essentials</span>
+            <h2 class="section-title">Iconic Best Sellers</h2>
+          </div>
+          <div class="section-actions-desktop">
+            <span class="curation-counter">Curated 04 of 24</span>
+          </div>
+        </div>
+
+        <div class="product-grid" id="new">
+          <!-- Product 1 -->
+          <article class="product-card reveal" data-id="p1" data-name="Cashmere Cocoon Knit Sweater" data-price="328000" data-img="https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=800&q=80">
+            <div class="product-card__visual">
+              <span class="badge badge--best">BEST</span>
+              <img src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=800&q=80" alt="Cashmere Cocoon Knit Sweater" loading="lazy">
+              <button class="product-card__cart-btn" aria-label="Cashmere Cocoon Knit Sweater 장바구니 담기">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <path d="M16 10a4 4 0 0 1-8 0"></path>
+                </svg>
+                <span>장바구니 담기</span>
+              </button>
+            </div>
+            <div class="product-card__details">
+              <span class="product-card__category">Apparel · Pure Cashmere</span>
+              <h3 class="product-card__name">Cashmere Cocoon Knit Sweater</h3>
+              <p class="product-card__desc">몽골산 최고급 100% 캐시미어로 빚어낸 온기</p>
+              <div class="product-card__price-row">
+                <span class="product-card__price">₩ 328,000</span>
+                <span class="product-card__rating">★ 4.9 (128)</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Product 2 -->
+          <article class="product-card reveal reveal--delay-1" data-id="p2" data-name="Velvet Santal Eau De Parfum" data-price="185000" data-img="https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=800&q=80">
+            <div class="product-card__visual">
+              <span class="badge badge--new">NEW</span>
+              <img src="https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=800&q=80" alt="Velvet Santal Eau De Parfum" loading="lazy">
+              <button class="product-card__cart-btn" aria-label="Velvet Santal Eau De Parfum 장바구니 담기">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <path d="M16 10a4 4 0 0 1-8 0"></path>
+                </svg>
+                <span>장바구니 담기</span>
+              </button>
+            </div>
+            <div class="product-card__details">
+              <span class="product-card__category">Fragrance · 50ml</span>
+              <h3 class="product-card__name">Velvet Santal Eau De Parfum</h3>
+              <p class="product-card__desc">스모키 우드와 고요한 화이트 머스크의 잔향</p>
+              <div class="product-card__price-row">
+                <span class="product-card__price">₩ 185,000</span>
+                <span class="product-card__rating">★ 5.0 (94)</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Product 3 -->
+          <article class="product-card reveal reveal--delay-2" data-id="p3" data-name="Handmade Sand Ceramic Vessel" data-price="142000" data-img="https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?auto=format&fit=crop&w=800&q=80">
+            <div class="product-card__visual">
+              <span class="badge badge--limited">LIMITED</span>
+              <img src="https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?auto=format&fit=crop&w=800&q=80" alt="Handmade Sand Ceramic Vessel" loading="lazy">
+              <button class="product-card__cart-btn" aria-label="Handmade Sand Ceramic Vessel 장바구니 담기">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <path d="M16 10a4 4 0 0 1-8 0"></path>
+                </svg>
+                <span>장바구니 담기</span>
+              </button>
+            </div>
+            <div class="product-card__details">
+              <span class="product-card__category">Living · Artisan Ceramic</span>
+              <h3 class="product-card__name">Handmade Sand Ceramic Vessel</h3>
+              <p class="product-card__desc">자연 토양 본연의 거친 질감을 살린 수공예 오브제</p>
+              <div class="product-card__price-row">
+                <span class="product-card__price">₩ 142,000</span>
+                <span class="product-card__rating">★ 4.8 (56)</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Product 4 -->
+          <article class="product-card reveal reveal--delay-3" data-id="p4" data-name="Minimalist Calfskin Card Wallet" data-price="118000" data-img="https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=800&q=80">
+            <div class="product-card__visual">
+              <span class="badge badge--best">BEST</span>
+              <img src="https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=800&q=80" alt="Minimalist Calfskin Card Wallet" loading="lazy">
+              <button class="product-card__cart-btn" aria-label="Minimalist Calfskin Card Wallet 장바구니 담기">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <path d="M16 10a4 4 0 0 1-8 0"></path>
+                </svg>
+                <span>장바구니 담기</span>
+              </button>
+            </div>
+            <div class="product-card__details">
+              <span class="product-card__category">Leather Goods · Taupe</span>
+              <h3 class="product-card__name">Minimalist Calfskin Card Wallet</h3>
+              <p class="product-card__desc">손끝에 착 감기는 프랑스산 송아지 가죽의 매끄러움</p>
+              <div class="product-card__price-row">
+                <span class="product-card__price">₩ 118,000</span>
+                <span class="product-card__rating">★ 4.9 (210)</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Brand Philosophy Section -->
+    <section class="brand-story section-py" id="about">
+      <div class="container">
+        <div class="brand-story__grid">
+          <!-- Left Text Content -->
+          <div class="brand-story__content reveal">
+            <span class="section-subtitle">Our Philosophy</span>
+            <h2 class="brand-story__title">
+              Crafted with Quiet Confidence,<br>
+              Designed for Eternity.
+            </h2>
+            <p class="brand-story__lead">
+              MAISON ÉLAN은 빠르게 지나가는 트렌드에 휩쓸리지 않고,<br>
+              시간이 흐를수록 깊이를 더해가는 본질적인 가치를 탐구합니다.
+            </p>
+            <p class="brand-story__text">
+              우리가 매일 마주하는 공간과 손끝에 닿는 모든 것들은 우리의 삶의 결을 결정짓습니다. 
+              우리는 전 세계 숙련된 공예 장인들과 협업하여 정직한 천연 소재와 간결한 선, 
+              그리고 기능성을 조화롭게 빚어낸 라이프스타일 오브제를 소개합니다.
+            </p>
+
+            <div class="brand-story__stats">
+              <div class="stat-item">
+                <span class="stat-num">100%</span>
+                <span class="stat-label">Natural & Ethical Materials</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-num">12+</span>
+                <span class="stat-label">Global Master Ateliers</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-num">Zero</span>
+                <span class="stat-label">Plastic Packaging Promise</span>
+              </div>
+            </div>
+
+            <div class="brand-story__quote">
+              <blockquote>“진정한 럭셔리는 눈에 띄는 화려함이 아니라, 머무는 순간 느껴지는 평온함입니다.”</blockquote>
+              <cite>— Studio Director, S. Laurent</cite>
+            </div>
+          </div>
+
+          <!-- Right Visual Editorial Box -->
+          <div class="brand-story__visual reveal reveal--delay-1">
+            <div class="visual-box">
+              <div class="visual-box__main-img">
+                <img src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1000&q=80" alt="Maison Elan Interior Studio" loading="lazy">
+              </div>
+              <div class="visual-box__floating-card">
+                <div class="floating-seal">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                  </svg>
+                </div>
+                <div class="floating-text">
+                  <span class="floating-title">Artisan Certified</span>
+                  <span class="floating-desc">Seoul & Paris Atelier Collaboration</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Reviews / Trust Section -->
+    <section class="reviews section-py bg-secondary" id="reviews">
+      <div class="container">
+        <div class="section-head text-center reveal">
+          <span class="section-subtitle">Verified Testimonials</span>
+          <h2 class="section-title">Words from Our Patrons</h2>
+          <p class="section-desc">MAISON ÉLAN의 제품을 경험한 고객들이 전하는 솔직하고 깊이 있는 기록입니다.</p>
+        </div>
+
+        <div class="reviews-grid">
+          <!-- Review 1 -->
+          <article class="review-card reveal">
+            <div class="review-card__stars" aria-label="별점 5점">
+              <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+            </div>
+            <p class="review-card__text">
+              “포장을 여는 순간 퍼지는 은은한 향과 캐시미어의 부드러움에 감탄했습니다. 하루의 피로가 씻겨 나가는 듯한 포근한 감촉 덕분에 매일 손이 가게 됩니다.”
+            </p>
+            <div class="review-card__author">
+              <div class="author-avatar">EJ</div>
+              <div class="author-meta">
+                <span class="author-name">이은진 님</span>
+                <span class="author-verified">Verified Buyer · Cashmere Cocoon Knit</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Review 2 -->
+          <article class="review-card reveal reveal--delay-1">
+            <div class="review-card__stars" aria-label="별점 5점">
+              <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+            </div>
+            <p class="review-card__text">
+              “세라믹 화병의 흙 질감이 사진보다 실물이 훨씬 고급스럽습니다. 거실 선반 중앙에 놓아두었는데, 공간 전체의 분위기가 차분하게 정리되는 느낌이에요.”
+            </p>
+            <div class="review-card__author">
+              <div class="author-avatar">MS</div>
+              <div class="author-meta">
+                <span class="author-name">박민서 님</span>
+                <span class="author-verified">Verified Buyer · Ceramic Vessel</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Review 3 -->
+          <article class="review-card reveal reveal--delay-2">
+            <div class="review-card__stars" aria-label="별점 5점">
+              <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+            </div>
+            <p class="review-card__text">
+              “벨벳 상탈 퍼퓸의 잔향이 정말 독보적입니다. 인위적이지 않고 고요한 나무 숲속에 있는 듯한 무드가 오래 지속되어 지인들에게도 자신 있게 추천했습니다.”
+            </p>
+            <div class="review-card__author">
+              <div class="author-avatar">JW</div>
+              <div class="author-meta">
+                <span class="author-name">정지원 님</span>
+                <span class="author-verified">Verified Buyer · Velvet Santal</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Newsletter Subscription Section -->
+    <section class="newsletter section-py" id="newsletter">
+      <div class="container">
+        <div class="newsletter__card reveal">
+          <div class="newsletter__content text-center">
+            <span class="section-subtitle">Private Invitation</span>
+            <h2 class="newsletter__title">Join the Atelier Journal</h2>
+            <p class="newsletter__desc">
+              신상품과 단독 혜택을 가장 먼저 받아보세요.<br>
+              매월 예술적 영감과 라이프스타일 큐레이션 레터를 전해드립니다.
+            </p>
+
+            <form class="newsletter__form" id="newsletterForm" novalidate>
+              <div class="newsletter__input-group">
+                <input 
+                  type="email" 
+                  id="newsletterEmail" 
+                  class="newsletter__input" 
+                  placeholder="이메일 주소를 입력해 주세요 (example@domain.com)" 
+                  aria-label="뉴스레터 구독 이메일 입력"
+                  required
+                >
+                <button type="submit" class="btn btn--primary newsletter__btn" id="newsletterSubmitBtn">
+                  <span>구독하기</span>
+                </button>
+              </div>
+              <!-- Status message container -->
+              <div class="newsletter__message" id="newsletterMessage" role="alert" aria-live="polite"></div>
+            </form>
+
+            <p class="newsletter__privacy">
+              구독 시 당사의 <a href="#privacy">개인정보 처리방침</a>에 동의하는 것으로 간주되며, 언제든 구독을 취소할 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 8. Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__top">
+        <!-- Brand Info -->
+        <div class="footer__col footer__col--brand">
+          <a href="#" class="brand-logo footer__logo">
+            <span class="brand-logo__main">MAISON ÉLAN</span>
+            <span class="brand-logo__sub">ATELIER DE SÉLECTION</span>
+          </a>
+          <p class="footer__tagline">
+            간결함과 본질에 집중하는 프리미엄 라이프스타일 큐레이션 스튜디오. 당신의 일상에 잔잔하고 우아한 여운을 전합니다.
+          </p>
+          <div class="footer__socials">
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="인스타그램 바로가기" class="social-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+              </svg>
+            </a>
+            <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" aria-label="핀터레스트 바로가기" class="social-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <line x1="12" y1="9" x2="12" y2="21"></line>
+                <path d="M8 12a4 4 0 1 1 8 0c0 2.22-1.78 4-4 4"></path>
+                <circle cx="12" cy="12" r="10"></circle>
+              </svg>
+            </a>
+            <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="유튜브 바로가기" class="social-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
+                <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Navigation Links -->
+        <div class="footer__col">
+          <h4 class="footer__heading">Navigation</h4>
+          <ul class="footer__list">
+            <li><a href="#new">New Arrivals</a></li>
+            <li><a href="#best">Best Sellers</a></li>
+            <li><a href="#collection">Curated Series</a></li>
+            <li><a href="#about">Our Story</a></li>
+            <li><a href="#reviews">Customer Stories</a></li>
+          </ul>
+        </div>
+
+        <!-- Customer Care -->
+        <div class="footer__col">
+          <h4 class="footer__heading">Customer Care</h4>
+          <ul class="footer__list">
+            <li><a href="#">주문 및 배송 조회</a></li>
+            <li><a href="#">교환 및 반품 안내</a></li>
+            <li><a href="#">기프트 바우처</a></li>
+            <li><a href="#">VIP 멤버십 혜택</a></li>
+            <li><a href="#">자주 묻는 질문 (FAQ)</a></li>
+          </ul>
+        </div>
+
+        <!-- Concierge / Contact -->
+        <div class="footer__col footer__col--contact">
+          <h4 class="footer__heading">Concierge</h4>
+          <p class="footer__info">
+            <strong>운영 시간:</strong> 월 - 금 10:00 - 18:00<br>
+            (점심 시간 12:30 - 13:30 / 주말 및 공휴일 휴무)
+          </p>
+          <p class="footer__info">
+            <strong>Tel:</strong> 1688-0000<br>
+            <strong>E-mail:</strong> concierge@maisonelan.com<br>
+            <strong>Showroom:</strong> 서울시 강남구 언주로 123길 메종 엘랑
+          </p>
+        </div>
+      </div>
+
+      <div class="footer__bottom">
+        <div class="footer__legal">
+          <p class="footer__copy">© 2026 MAISON ÉLAN ATELIER. All Rights Reserved.</p>
+          <div class="footer__policy-links">
+            <a href="#terms">이용약관</a>
+            <span class="divider">·</span>
+            <a href="#privacy">개인정보 처리방침</a>
+            <span class="divider">·</span>
+            <a href="#business">사업자정보확인</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
