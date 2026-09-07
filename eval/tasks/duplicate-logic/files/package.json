@@ -1,0 +1,6 @@
+{
+  "name": "ledger",
+  "version": "1.7.2",
+  "type": "module",
+  "main": "src/index.js"
+}

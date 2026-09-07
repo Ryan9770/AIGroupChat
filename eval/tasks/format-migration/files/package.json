@@ -1,0 +1,6 @@
+{
+  "name": "record-store",
+  "version": "3.1.0",
+  "type": "module",
+  "main": "src/index.js"
+}

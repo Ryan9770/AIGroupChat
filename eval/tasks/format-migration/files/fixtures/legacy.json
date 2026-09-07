@@ -1,0 +1,5 @@
+[
+  {"v":1,"name":"acme-report","tags":["q3","final"]},
+  {"v":1,"name":"no-tags-record"},
+  {"v":1,"name":"null-tags-record","tags":null}
+]

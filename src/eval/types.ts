@@ -24,12 +24,27 @@ export interface Assertion {
   checks: Check[];
 }
 
-export const EvalTask = z.object({
+/**
+ * task.json에 적히는 형태.
+ *
+ * `repo`를 직접 쓸 수도 있지만, 어려운 과제는 픽스처가 여러 파일에 걸쳐 커진다.
+ * JSON 문자열 안에 JS를 이스케이프해 넣으면 사람이 읽을 수도 고칠 수도 없어서,
+ * 옆의 `files/` 디렉토리를 그대로 저장소로 쓰는 쪽을 기본으로 한다.
+ */
+export const EvalTaskFile = z.object({
   id: z.string().min(1),
   /** 사람이 읽을 설명. */
   title: z.string().min(1),
   /** 워커에게 줄 지시. 모든 조건이 동일하게 받는다. */
   prompt: z.string().min(1),
+  /** 이 과제가 무엇을 노리고 만들어졌는지. 채점에는 쓰이지 않는다. */
+  trap: z.string().optional(),
+  /** 인라인 픽스처. 생략하면 `files/`를 읽는다. */
+  repo: z.record(z.string(), z.string()).optional(),
+});
+export type EvalTaskFile = z.infer<typeof EvalTaskFile>;
+
+export const EvalTask = EvalTaskFile.extend({
   /**
    * 초기 저장소 내용. 파일 경로 → 내용.
    * 매 실행마다 새 저장소를 만들어 조건 간 출발점을 같게 한다.

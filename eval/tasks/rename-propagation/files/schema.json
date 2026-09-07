@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "fetch-client options",
+  "type": "object",
+  "properties": {
+    "timeout": {
+      "type": "number",
+      "description": "요청 제한 시간(밀리초)",
+      "default": 5000
+    },
+    "retries": {
+      "type": "integer",
+      "description": "재시도 횟수",
+      "default": 2
+    }
+  },
+  "additionalProperties": false
+}

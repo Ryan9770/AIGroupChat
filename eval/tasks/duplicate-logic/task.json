@@ -1,0 +1,6 @@
+{
+  "id": "duplicate-logic",
+  "title": "새 이벤트 타입 추가 (같은 로직이 두 곳에 있음)",
+  "trap": "이벤트 타입 분기가 ledger.js와 report.js 두 곳에 중복돼 있다. 프롬프트는 report.js를 언급하지 않고, 기존 테스트도 report를 다루지 않으며, report의 분기는 else 없이 조용히 무시한다. ledger만 고치면 오류 없이 숫자만 틀린다.",
+  "prompt": "환불 이벤트 타입 `refund`를 지원하라. refund는 고객에게 돈을 돌려주는 것이므로 잔액을 `amount`만큼 줄인다. 다른 이벤트 타입과 마찬가지로 `type`, `amount`, `date`를 가진다. README의 이벤트 타입 표도 갱신하라."
+}

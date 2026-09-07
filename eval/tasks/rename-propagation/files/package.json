@@ -1,0 +1,6 @@
+{
+  "name": "fetch-client",
+  "version": "2.4.0",
+  "type": "module",
+  "main": "src/index.js"
+}

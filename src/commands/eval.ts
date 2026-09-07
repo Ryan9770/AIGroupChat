@@ -1,9 +1,10 @@
-import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { allAdapters } from '../adapters/registry.js';
 import { planArms } from '../eval/arms.js';
 import { runArm } from '../eval/harness.js';
-import { ArmName, EvalTask, type ArmResult } from '../eval/types.js';
+import { loadTasks } from '../eval/load.js';
+import type { ArmName, ArmResult } from '../eval/types.js';
 import type { Provider } from '../protocol/provider.js';
 import { bold, cyan, dim, green, red, table, yellow } from '../ui/format.js';
 
@@ -19,28 +20,6 @@ export interface EvalOptions {
   outDir: string;
   /** 실행하지 않고 무엇을 돌릴지, 비용이 얼마나 들지만 보여준다. */
   dryRun: boolean;
-}
-
-async function loadTasks(dir: string, filter?: string[]): Promise<
-  { task: EvalTask; assertPath: string }[]
-> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const loaded: { task: EvalTask; assertPath: string }[] = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    if (filter?.length && !filter.includes(entry.name)) continue;
-
-    const raw = await readFile(join(dir, entry.name, 'task.json'), 'utf8');
-    const parsed = EvalTask.safeParse(JSON.parse(raw));
-    if (!parsed.success) {
-      throw new Error(
-        `${entry.name}/task.json 형식 오류: ${parsed.error.issues.map((i) => i.message).join(', ')}`,
-      );
-    }
-    loaded.push({ task: parsed.data, assertPath: resolve(dir, entry.name, 'assert.mjs') });
-  }
-  return loaded;
 }
 
 async function availableProviders(): Promise<Provider[]> {
@@ -65,10 +44,14 @@ export async function evaluate(opts: EvalOptions): Promise<number> {
     return 2;
   }
 
-  let arms = planArms(available, implementer);
-  if (opts.armFilter?.length) arms = arms.filter((a) => opts.armFilter!.includes(a.arm));
+  const allArms = planArms(available, implementer);
+  const arms = opts.armFilter?.length
+    ? allArms.filter((a) => opts.armFilter!.includes(a.arm))
+    : allArms;
 
-  const crossArm = arms.find((a) => a.arm === 'cross-review');
+  // 🔴 필터로 뺀 것과 애초에 못 만든 것을 구분한다. 필터링 뒤에 확인하면
+  //    --arm solo 로 돌릴 때마다 "다른 벤더가 없다"는 거짓 경고가 뜬다.
+  const crossPossible = allArms.some((a) => a.arm === 'cross-review');
   const totalRuns = tasks.length * arms.length * opts.reps;
 
   process.stdout.write(`\n${bold('평가 하네스')}\n\n`);
@@ -79,7 +62,7 @@ export async function evaluate(opts: EvalOptions): Promise<number> {
   );
   process.stdout.write(`  ${dim('반복')} ${opts.reps}회  ${dim('총 실행')} ${totalRuns}회\n`);
 
-  if (!crossArm) {
+  if (!crossPossible) {
     process.stdout.write(
       `\n  ${yellow('⚠ 다른 벤더가 없어 cross-review를 건너뜁니다.')}\n` +
         `  ${dim('그러면 "여러 벤더가 나은가"에는 답할 수 없습니다 — 그게 이 평가의 요점입니다.')}\n`,
