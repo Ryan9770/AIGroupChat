@@ -36,8 +36,20 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   buildArgv(req: TaskRequest): Argv {
-    const args = ['exec', '--json', '--sandbox', req.mode === 'plan' ? 'read-only' : 'workspace-write'];
+    // ⚠️ 워커 협약과 read-only 샌드박스는 양립하지 않는다.
+    //
+    // 협약에서 완료를 보고하려면 run 디렉토리에 메시지 파일을 **써야** 한다.
+    // 그런데 `--sandbox read-only`는 어디에도 쓰지 못하게 막는다. 그래서
+    // plan 모드 + 협약으로 codex를 돌리면 워커가 보고를 못 하고,
+    // 정산이 no_completion으로 떨어진다(실측).
+    //
+    // writableDirs가 있으면 workspace-write로 올리고 그 경로를 열어준다.
+    // 읽기 전용 강제가 약해지는 대신 보고가 가능해진다. 안전 경계는
+    // 여전히 worktree 격리다. 협약이 필요 없으면 writableDirs를 비우면 된다.
+    const needsWrite = req.mode !== 'plan' || (req.writableDirs?.length ?? 0) > 0;
+    const args = ['exec', '--json', '--sandbox', needsWrite ? 'workspace-write' : 'read-only'];
     args.push('-c', 'approval_policy="never"');
+    for (const dir of req.writableDirs ?? []) args.push('--add-dir', dir);
     if (req.model) args.push('--model', req.model);
     if (req.resumeId) args.push('resume', req.resumeId);
     args.push('-');

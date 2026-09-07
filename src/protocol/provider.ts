@@ -50,4 +50,13 @@ export interface TaskRequest {
    * 자격증명은 절대 넣지 않는다. SPEC §9.1
    */
   env?: Record<string, string>;
+  /**
+   * 워커가 작업 디렉토리 밖에서 반드시 써야 하는 경로.
+   *
+   * 워커 협약의 run 디렉토리가 여기 들어간다. 워커가 완료를 보고하려면
+   * 그 디렉토리에 메시지 파일을 써야 하기 때문이다.
+   *
+   * 샌드박스가 있는 provider(codex)만 이걸 신경 쓴다.
+   */
+  writableDirs?: string[];
 }

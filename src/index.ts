@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { doctor } from './commands/doctor.js';
+import { planRun, planShow } from './commands/plan.js';
 import { run } from './commands/run.js';
 import {
   workerAsk,
@@ -99,6 +100,55 @@ program
         answerMode: opts.autoAnswer ? ('auto' as const) : ('human' as const),
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.resume ? { resume: opts.resume } : {}),
+      });
+    },
+  );
+
+const plan = program
+  .command('plan')
+  .description('여러 Task로 이루어진 계획(DAG)을 여러 provider에 배분해 실행한다');
+
+plan
+  .command('show')
+  .description('실행하지 않고 DAG와 provider 배정만 보여준다')
+  .argument('<file>', '계획 JSON 파일')
+  .option('--offline', '인증 프로브를 생략한다', false)
+  .action(async (file: string, opts: { offline: boolean }) => {
+    process.exitCode = await planShow(file, opts.offline);
+  });
+
+plan
+  .command('run')
+  .description('계획을 실행한다. 각 Task는 선행 작업이 정산된 뒤에만 시작한다')
+  .argument('<file>', '계획 JSON 파일')
+  .option('--cwd <path>', '대상 저장소', process.cwd())
+  .option('--timeout <ms>', 'Task별 타임아웃(ms)', '900000')
+  .option('--no-isolate', '호스트 컨텍스트 격리를 끈다')
+  .option('-y, --yolo', '도구 승인 프롬프트를 자동 승인한다', false)
+  .option('-P, --no-protocol', '워커 협약을 끈다')
+  .option('--auto-answer', '워커 질문에 자동 응답한다', false)
+  .option('-v, --verbose', '각 워커의 출력을 그대로 보여준다', false)
+  .action(
+    async (
+      file: string,
+      opts: {
+        cwd: string;
+        timeout: string;
+        isolate: boolean;
+        yolo: boolean;
+        protocol: boolean;
+        autoAnswer: boolean;
+        verbose: boolean;
+      },
+    ) => {
+      process.exitCode = await planRun(file, {
+        cwd: opts.cwd,
+        isolate: opts.isolate !== false,
+        autoApprove: opts.yolo,
+        protocol: opts.protocol !== false,
+        answerMode: opts.autoAnswer ? 'auto' : 'human',
+        timeoutMs: Number(opts.timeout),
+        verbose: opts.verbose,
       });
     },
   );
