@@ -1,4 +1,4 @@
-import type { TaskRole } from '../protocol/plan.js';
+import type { Routes, TaskRole } from '../protocol/plan.js';
 import type { Provider } from '../protocol/provider.js';
 
 /**
@@ -18,10 +18,22 @@ export const DEFAULT_ROUTES: Record<TaskRole, Provider[]> = {
 
 export interface RouteRequest {
   role: TaskRole;
-  /** 계획이 직접 지정한 후보. 있으면 기본값 대신 이걸 쓴다. */
+  /** 계획이 Task에 직접 지정한 후보. 가장 우선한다. */
   preferred?: Provider[];
+  /**
+   * 역할별 담당 오버라이드(계획 파일 또는 설정 파일).
+   * 우선순위: task.providers > routes > DEFAULT_ROUTES
+   */
+  routes?: Routes;
   /** 실제로 쓸 수 있는 provider (doctor 결과). */
   available: Provider[];
+  /**
+   * 담당이 명시적으로 지정됐는가(계획의 task.providers 또는 routes).
+   *
+   * 명시 지정은 휴리스틱을 이긴다. "claude가 검토한다"고 못박아 뒀는데
+   * 교차 검증 규칙이 끼어들어 경고를 띄우면, 의도한 구성인데도 문제처럼 보인다.
+   */
+  explicit?: boolean;
   /**
    * 이 Task가 검토하는 산출물을 만든 provider.
    * 교차 검증을 위해 같은 provider를 피한다.
@@ -45,11 +57,17 @@ export interface RouteResult {
  * 같은 벤더의 자기 검토라도 하는 편이 낫다. 대신 그 사실을 reason에 남긴다.
  */
 export function route(request: RouteRequest): RouteResult | null {
-  const candidates = (request.preferred ?? DEFAULT_ROUTES[request.role]).filter((p) =>
-    request.available.includes(p),
-  );
+  const table =
+    request.preferred ?? request.routes?.[request.role] ?? DEFAULT_ROUTES[request.role];
+  const candidates = table.filter((p) => request.available.includes(p));
 
   if (candidates.length === 0) return null;
+
+  // 사람이 직접 정한 담당이면 그대로 따른다.
+  if (request.explicit) {
+    const [provider, ...fallbacks] = candidates;
+    return { provider: provider!, fallbacks, reason: `${request.role}: ${provider} (지정됨)` };
+  }
 
   const avoid = new Set(request.avoid ?? []);
   const preferred = candidates.filter((p) => !avoid.has(p));

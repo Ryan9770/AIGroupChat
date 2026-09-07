@@ -1,0 +1,50 @@
+{
+  "objective": "Claude가 설계·검토, Antigravity가 구현 (1순위 지정, 쿼터 소진 시 대체)",
+  "routes": {
+    "design": [
+      "claude",
+      "codex"
+    ],
+    "implement": [
+      "antigravity",
+      "claude"
+    ],
+    "review": [
+      "claude",
+      "codex"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "design",
+      "role": "design",
+      "spec": "요청받은 변경을 어떻게 만들지 설계하라. 저장소를 실제로 읽고, 건드릴 파일과 방법을 구체적으로 정하라. 파일은 수정하지 마라.",
+      "workspace": "none"
+    },
+    {
+      "id": "implement",
+      "role": "implement",
+      "spec": "참고 자료의 설계대로 구현하라. 설계가 저장소 실내용과 어긋나면 저장소를 기준으로 삼고, 어긋난 점을 보고에 적어라.",
+      "dependsOn": [
+        "design"
+      ],
+      "context": [
+        "design"
+      ],
+      "workspace": "new"
+    },
+    {
+      "id": "review",
+      "role": "review",
+      "spec": "git diff HEAD를 검토하라. 설계 의도대로 됐는지, 저장소 실내용과 어긋나는 곳은 없는지 확인하고 문제를 나열하라. 파일은 수정하지 마라.",
+      "dependsOn": [
+        "implement"
+      ],
+      "context": [
+        "design",
+        "implement"
+      ],
+      "workspace": "inherit:implement"
+    }
+  ]
+}

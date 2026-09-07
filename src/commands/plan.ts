@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { allAdapters } from '../adapters/registry.js';
+import { loadConfig } from '../core/config.js';
 import { Governor } from '../core/governor.js';
 import { runPlan, SchedulerError, type TaskOutcome } from '../core/scheduler.js';
 import { DEFAULT_ROUTES, route } from '../core/router.js';
-import { Plan, topoOrder, validatePlan } from '../protocol/plan.js';
+import { Plan, topoOrder, validatePlan, type Routes } from '../protocol/plan.js';
 import type { Provider } from '../protocol/provider.js';
 import { createRun } from '../store/run-store.js';
 import { bold, cyan, dim, green, red, table, yellow } from '../ui/format.js';
@@ -31,8 +32,10 @@ async function availableProviders(offline: boolean): Promise<Provider[]> {
 }
 
 /** 실행하지 않고 DAG와 라우팅 결과만 보여준다. */
-export async function planShow(path: string, offline: boolean): Promise<number> {
+export async function planShow(path: string, offline: boolean, cwd: string): Promise<number> {
   const plan = await loadPlan(path);
+  const loaded = await loadConfig(cwd);
+  const routes = mergeRoutes(loaded.config.routes, plan.routes);
   const issues = validatePlan(plan);
 
   process.stdout.write(`\n${bold(plan.objective)}\n\n`);
@@ -56,11 +59,14 @@ export async function planShow(path: string, offline: boolean): Promise<number> 
       .map((ref) => assigned.get(ref))
       .filter((p): p is Provider => p !== undefined);
 
+    const explicit = Boolean(task.providers ?? routes?.[task.role]);
     const routed = route({
       role: task.role,
       available,
+      explicit,
+      ...(routes ? { routes } : {}),
       ...(task.providers ? { preferred: task.providers } : {}),
-      ...(avoid.length > 0 && task.role === 'review' ? { avoid } : {}),
+      ...(!explicit && avoid.length > 0 && task.role === 'review' ? { avoid } : {}),
     });
     if (routed) assigned.set(id, routed.provider);
 
@@ -79,14 +85,25 @@ export async function planShow(path: string, offline: boolean): Promise<number> 
   );
 
   const unassigned = rows.filter((r) => r[4]?.includes('없음')).length;
+
+  if (loaded.problem) {
+    process.stdout.write(`\n${red(`설정 파일 문제 (${loaded.path}): ${loaded.problem}`)}\n`);
+  } else if (loaded.path) {
+    process.stdout.write(`\n${dim('설정')} ${loaded.path}\n`);
+  }
+
+  process.stdout.write(`\n${dim('사용 가능')} ${available.join(', ') || red('없음')}\n`);
+
+  // 담당이 지정됐으면 기본값 대신 그걸 보여준다. 둘 다 보여주면 뭐가 적용됐는지 헷갈린다.
+  const effective = routes ?? DEFAULT_ROUTES;
   process.stdout.write(
-    `\n${dim('사용 가능')} ${available.join(', ') || red('없음')}\n` +
-      `${dim('기본 라우팅')} ${Object.entries(DEFAULT_ROUTES)
-        .map(([role, providers]) => `${role}=${providers[0]}`)
-        .join('  ')}\n\n`,
+    `${dim(routes ? '역할별 담당 (지정됨)' : '역할별 담당 (기본값)')} ${Object.entries(effective)
+      .map(([role, providers]) => `${role}=${(providers ?? []).join('>') || '-'}`)
+      .join('  ')}\n\n`,
   );
 
-  return unassigned > 0 ? 1 : 0;
+  // 설정이 무시되고 있는데 exit 0이면 스크립트가 눈치채지 못한다.
+  return unassigned > 0 || loaded.problem ? 1 : 0;
 }
 
 export interface PlanRunOptions {
@@ -99,14 +116,21 @@ export interface PlanRunOptions {
   verbose: boolean;
   /** 실행 전체 비용 상한(USD). */
   budgetUsd?: number;
-  /** Task 하나당 최대 시도 횟수(페일오버 포함). */
-  maxAttempts: number;
+  /** Task 하나당 최대 시도 횟수(페일오버 포함). 없으면 설정 파일 → 기본 3. */
+  maxAttempts?: number;
   /** provider별 배치 수 상한. 구독 사용량 보호용. */
   maxPerProvider?: number;
 }
 
 export async function planRun(path: string, opts: PlanRunOptions): Promise<number> {
   const plan = await loadPlan(path);
+  const loaded = await loadConfig(opts.cwd);
+  if (loaded.problem) {
+    process.stderr.write(`${red(`설정 파일 문제 (${loaded.path}): ${loaded.problem}`)}
+`);
+    return 2;
+  }
+  const routes = mergeRoutes(loaded.config.routes, plan.routes);
   const available = await availableProviders(false);
 
   if (available.length === 0) {
@@ -121,7 +145,9 @@ export async function planRun(path: string, opts: PlanRunOptions): Promise<numbe
   process.stdout.write(`${dim('run')} ${relative(stateRoot, runDir).split('\\').join('/')}\n\n`);
 
   const governor = new Governor({
-    ...(opts.budgetUsd !== undefined ? { budgetUsd: opts.budgetUsd } : {}),
+    ...(opts.budgetUsd ?? loaded.config.budgetUsd) !== undefined
+      ? { budgetUsd: (opts.budgetUsd ?? loaded.config.budgetUsd)! }
+      : {},
     ...(opts.maxPerProvider !== undefined
       ? { maxDispatchesPerProvider: opts.maxPerProvider }
       : {}),
@@ -138,6 +164,7 @@ export async function planRun(path: string, opts: PlanRunOptions): Promise<numbe
       runDir,
       cwd: opts.cwd,
       available,
+      ...(routes ? { routes } : {}),
       isolate: opts.isolate,
       autoApprove: opts.autoApprove,
       protocol: opts.protocol,
@@ -145,7 +172,7 @@ export async function planRun(path: string, opts: PlanRunOptions): Promise<numbe
       timeoutMs: opts.timeoutMs,
       signal: controller.signal,
       governor,
-      maxAttempts: opts.maxAttempts,
+      maxAttempts: opts.maxAttempts ?? loaded.config.maxAttempts ?? 3,
       onFailover: (taskId, from, to, reason) => {
         process.stdout.write(
           `  ${yellow(`↻ ${from} → ${to}`)} ${dim(`(${reason}) — 같은 Task의 새 시도`)}
@@ -258,4 +285,10 @@ ${dim('쿼터')}
   process.stdout.write('\n');
 
   return failed.length === 0 ? 0 : 1;
+}
+
+/** 설정 파일 담당 위에 계획 파일 담당을 덮어쓴다. 둘 다 없으면 undefined. */
+function mergeRoutes(base?: Routes, override?: Routes): Routes | undefined {
+  if (!base && !override) return undefined;
+  return { ...(base ?? {}), ...(override ?? {}) };
 }

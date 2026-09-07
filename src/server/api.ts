@@ -3,11 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allAdapters } from '../adapters/registry.js';
+import { loadConfig } from '../core/config.js';
 import { executeDispatch } from '../core/dispatch.js';
 import { Governor } from '../core/governor.js';
 import { DEFAULT_ROUTES, route } from '../core/router.js';
 import { runPlan, SchedulerError } from '../core/scheduler.js';
-import { Plan, topoOrder, validatePlan } from '../protocol/plan.js';
+import { Plan, topoOrder, validatePlan, type Routes } from '../protocol/plan.js';
 import type { Provider } from '../protocol/provider.js';
 import { createRun, newTaskId } from '../store/run-store.js';
 import { git, findRepoRoot } from '../workspace/git.js';
@@ -124,7 +125,8 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
 
   // ── 계획 미리보기 ──────────────────────────────────────────────────────
   app.post('/api/plan/preview', async (request, reply) => {
-    const parsed = Plan.safeParse((request.body as { plan?: unknown }).plan);
+    const body = request.body as { plan?: unknown; cwd?: string };
+    const parsed = Plan.safeParse(body.plan);
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'invalid',
@@ -136,6 +138,8 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
     }
 
     const plan = parsed.data;
+    const loaded = await loadConfig(resolve(body.cwd ?? opts.defaultCwd));
+    const routes = mergeRoutes(loaded.config.routes, plan.routes);
     const issues = validatePlan(plan);
     const available = await availableProviders();
     const byId = new Map(plan.tasks.map((t) => [t.id, t]));
@@ -146,11 +150,14 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
       const avoid = task.context
         .map((ref) => assigned.get(ref))
         .filter((p): p is Provider => p !== undefined);
+      const explicit = Boolean(task.providers ?? routes?.[task.role]);
       const routed = route({
         role: task.role,
         available,
+        explicit,
+        ...(routes ? { routes } : {}),
         ...(task.providers ? { preferred: task.providers } : {}),
-        ...(avoid.length > 0 && task.role === 'review' ? { avoid } : {}),
+        ...(!explicit && avoid.length > 0 && task.role === 'review' ? { avoid } : {}),
       });
       if (routed) assigned.set(id, routed.provider);
       return {
@@ -164,7 +171,14 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
       };
     });
 
-    return { issues, tasks: rows, available };
+    return {
+      issues,
+      tasks: rows,
+      available,
+      routes: routes ?? null,
+      configPath: loaded.path ?? null,
+      configProblem: loaded.problem ?? null,
+    };
   });
 
   // ── 실행 ───────────────────────────────────────────────────────────────
@@ -273,6 +287,11 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
 
     const plan = parsed.data;
     const cwd = resolve(body.cwd ?? opts.defaultCwd);
+    const loaded = await loadConfig(cwd);
+    if (loaded.problem) {
+      return reply.code(400).send({ error: `설정 파일 문제 (${loaded.path}): ${loaded.problem}` });
+    }
+    const routes = mergeRoutes(loaded.config.routes, plan.routes);
     const available = await availableProviders();
     if (available.length === 0) {
       return reply.code(400).send({ error: '로그인된 provider가 없습니다' });
@@ -291,6 +310,7 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
           runDir,
           cwd,
           available,
+          ...(routes ? { routes } : {}),
           isolate: true,
           autoApprove: body.yolo === true,
           protocol: body.protocol !== false,
@@ -409,4 +429,10 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
 async function availableProviders(): Promise<Provider[]> {
   const results = await Promise.all(allAdapters().map((a) => a.preflight(false)));
   return results.filter((r) => r.installed && r.authed === true).map((r) => r.provider);
+}
+
+/** 설정 파일 담당 위에 계획 파일 담당을 덮어쓴다. */
+function mergeRoutes(base?: Routes, override?: Routes): Routes | undefined {
+  if (!base && !override) return undefined;
+  return { ...(base ?? {}), ...(override ?? {}) };
 }

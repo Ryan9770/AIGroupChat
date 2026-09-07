@@ -140,6 +140,16 @@ pre.diff{background:var(--code);border:1px solid var(--line);border-radius:8px;p
   <!-- ── 계획 ─────────────────────────────────────────────── -->
   <section id="tab-plan" hidden>
     <div class="card">
+      <h2>역할별 담당</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))" id="routeGrid"></div>
+      <div class="hint">비워두면 기본 라우팅을 씁니다. 지정하면 교차 검증 규칙보다 우선합니다.
+        <span id="routeConfig"></span></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" id="presetClaudeLeads">Claude 팀장 · agy 수행</button>
+        <button class="ghost" id="presetClear">기본값으로</button>
+      </div>
+    </div>
+    <div class="card">
       <h2>Task</h2>
       <div id="taskList"></div>
       <div class="row" style="margin-top:10px">
@@ -236,6 +246,7 @@ async function loadStatus() {
     const usable = providers.filter((p) => p.installed && p.authed === true);
     $('runAgent').innerHTML = usable.map((p) => `<option value="${esc(p.provider)}">${esc(p.provider)}</option>`).join('');
     $('conn').textContent = `${usable.length}/${providers.length} 사용 가능`;
+    renderRoutes();
   } catch (err) {
     $('conn').innerHTML = `<span class="bad">연결 실패 — 토큰이 포함된 주소로 접속했는지 확인하세요</span>`;
   }
@@ -338,6 +349,41 @@ $('runStop').onclick = () => api('/api/cancel', { method: 'POST', body: JSON.str
 
 /* ── 계획 ───────────────────────────────────────────────── */
 let tasks = [];
+let routes = {};
+
+const ROLES = ['design', 'implement', 'review', 'custom'];
+function renderRoutes() {
+  const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
+  $('routeGrid').innerHTML = ROLES.map((role) => `
+    <div><label>${role}</label><select data-role="${role}">
+      <option value="">기본값</option>
+      ${usable.map((p) => `<option value="${p}" ${routes[role]?.[0] === p ? 'selected' : ''}>${p}</option>`).join('')}
+    </select></div>`).join('');
+
+  $('routeGrid').querySelectorAll('select').forEach((el) => {
+    el.onchange = () => {
+      const role = el.dataset.role;
+      // 고른 provider를 1순위로 두고, 나머지는 페일오버 후보로 남긴다.
+      if (!el.value) delete routes[role];
+      else routes[role] = [el.value, ...usable.filter((p) => p !== el.value)];
+    };
+  });
+}
+$('presetClaudeLeads').onclick = () => {
+  // 설계·검토는 claude가, 구현은 agy가.
+  // 1순위만 두면 쿼터가 차는 순간 실행이 멈춘다. 나머지를 대체 후보로 남긴다.
+  const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
+  const withFallback = (first) =>
+    usable.includes(first) ? [first, ...usable.filter((p) => p !== first)] : usable;
+  routes = {
+    design: withFallback('claude'),
+    implement: withFallback('antigravity'),
+    review: withFallback('claude'),
+  };
+  renderRoutes();
+};
+$('presetClear').onclick = () => { routes = {}; renderRoutes(); };
+
 const SAMPLE = {
   objective: 'README에 설치 안내 섹션 추가',
   tasks: [
@@ -390,12 +436,19 @@ $('loadSample').onclick = () => {
 
 const currentPlan = () => ({
   objective: $('planObjective').value || '(목표 없음)',
+  ...(Object.keys(routes).length ? { routes } : {}),
   tasks: tasks.map((t) => ({ ...t, models: t.models || undefined })),
 });
 
 $('planPreview').onclick = async () => {
   try {
-    const data = await api('/api/plan/preview', { method: 'POST', body: JSON.stringify({ plan: currentPlan() }) });
+    const data = await api('/api/plan/preview', {
+      method: 'POST',
+      body: JSON.stringify({ plan: currentPlan(), cwd: $('cwd').value }),
+    });
+    $('routeConfig').innerHTML = data.configProblem
+      ? `<span class="bad">설정 파일 문제: ${esc(data.configProblem)}</span>`
+      : data.configPath ? `설정 파일: <span class="mono">${esc(data.configPath)}</span>` : '';
     const issues = data.issues.length
       ? `<div class="bad" style="margin-bottom:8px">${data.issues.map((i) => `· ${esc(i.taskId)}: ${esc(i.message)}`).join('<br>')}</div>` : '';
     $('planPreviewOut').innerHTML = issues + `<table><thead><tr>

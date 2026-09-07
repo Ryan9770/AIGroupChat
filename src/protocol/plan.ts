@@ -56,8 +56,19 @@ export const PlanTask = z.object({
 });
 export type PlanTask = z.infer<typeof PlanTask>;
 
+/**
+ * 역할별 담당 provider. 앞에서부터 시도하고, 실패하면 다음으로 넘어간다.
+ *
+ * "claude가 설계·검토하고 agy가 구현한다" 같은 팀 구성을 여기서 한 번에 정한다.
+ * Task마다 `providers`를 적는 것보다 의도가 분명하고 바꾸기 쉽다.
+ */
+export const Routes = z.record(TaskRole, z.array(z.enum(PROVIDERS)));
+export type Routes = z.infer<typeof Routes>;
+
 export const Plan = z.object({
   objective: z.string().min(1),
+  /** 이 계획에만 적용할 역할별 담당. 설정 파일보다 우선한다. */
+  routes: Routes.optional(),
   tasks: z.array(PlanTask).min(1),
 });
 export type Plan = z.infer<typeof Plan>;

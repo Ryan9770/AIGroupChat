@@ -114,8 +114,9 @@ plan
   .description('실행하지 않고 DAG와 provider 배정만 보여준다')
   .argument('<file>', '계획 JSON 파일')
   .option('--offline', '인증 프로브를 생략한다', false)
-  .action(async (file: string, opts: { offline: boolean }) => {
-    process.exitCode = await planShow(file, opts.offline);
+  .option('--cwd <path>', '설정 파일을 찾을 대상 저장소', process.cwd())
+  .action(async (file: string, opts: { offline: boolean; cwd: string }) => {
+    process.exitCode = await planShow(file, opts.offline, opts.cwd);
   });
 
 plan
@@ -156,7 +157,7 @@ plan
         answerMode: opts.autoAnswer ? 'auto' : 'human',
         timeoutMs: Number(opts.timeout),
         verbose: opts.verbose,
-        maxAttempts: Number(opts.maxAttempts),
+        ...(opts.maxAttempts ? { maxAttempts: Number(opts.maxAttempts) } : {}),
         ...(opts.budgetUsd !== undefined ? { budgetUsd: Number(opts.budgetUsd) } : {}),
         ...(opts.maxPerProvider !== undefined
           ? { maxPerProvider: Number(opts.maxPerProvider) }

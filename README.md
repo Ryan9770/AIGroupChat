@@ -227,7 +227,39 @@ review     review     implement  inherit:implement  codex        claude,antigrav
 **`inherit:`** — 리뷰어가 구현 결과를 보려면 같은 worktree에 있어야 한다. 별도로 파면
 리뷰어에게 변경이 보이지 않는다. `inherit:X`인데 `dependsOn`에 X가 없으면 실행 전에 거부한다.
 
-### 기본 라우팅
+### 역할별 담당 정하기 — "Claude 팀장, agy 수행"
+
+누가 무슨 역할을 맡을지 한 번만 정해두면 됩니다. 세 가지 방법이 있고, **아래로 갈수록 우선**합니다.
+
+**1. 저장소에 `conductor.config.json`** — 그 저장소의 모든 계획에 적용됩니다.
+
+```json
+{
+  "routes": {
+    "design":    ["claude", "codex"],
+    "implement": ["antigravity", "claude"],
+    "review":    ["claude", "codex"]
+  },
+  "budgetUsd": 2
+}
+```
+
+**2. 계획 파일의 `routes`** — 그 계획에만 적용됩니다. 예시: `examples/claude-leads-agy-works.json`
+
+**3. Task의 `providers`** — 그 Task에만 적용됩니다.
+
+웹 UI 계획 탭에는 **"Claude 팀장 · agy 수행"** 프리셋 버튼이 있습니다.
+
+> 🔴 **1순위만 적지 마세요.** `"review": ["claude"]`처럼 하나만 두면 claude 쿼터가 차는 순간
+> 그 Task가 실패합니다. 뒤에 대체 후보를 남겨두면 자동으로 넘어갑니다.
+
+> 담당을 지정하면 **교차 검증 규칙보다 우선합니다.** "claude가 설계하고 claude가 검토"처럼
+> 일부러 같은 벤더를 쓰는 구성도 경고 없이 그대로 실행됩니다.
+
+설정 파일 형식이 틀리면 **조용히 무시하지 않고** 알려줍니다 — `plan run`은 거부(exit 2),
+`plan show`는 문제를 표시하고 exit 1.
+
+### 기본 라우팅 (지정하지 않았을 때)
 
 ```
 design    claude, codex          (읽기 전용을 CLI로 강제할 수 있는 provider)

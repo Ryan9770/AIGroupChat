@@ -1,4 +1,4 @@
-import type { Plan, PlanTask } from '../protocol/plan.js';
+import type { Plan, PlanTask, Routes } from '../protocol/plan.js';
 import { topoOrder, validatePlan } from '../protocol/plan.js';
 import type { Provider } from '../protocol/provider.js';
 import type { Workspace } from '../workspace/worktree.js';
@@ -43,6 +43,8 @@ export interface SchedulerOptions {
   runDir: string;
   cwd: string;
   available: Provider[];
+  /** 역할별 담당 오버라이드. 계획 파일 > 설정 파일 순으로 합쳐서 넘긴다. */
+  routes?: Routes;
   isolate: boolean;
   autoApprove: boolean;
   protocol: boolean;
@@ -131,11 +133,15 @@ export async function runPlan(opts: SchedulerOptions): Promise<TaskOutcome[]> {
       .map((ref) => outcomes.get(ref)?.provider)
       .filter((p): p is Provider => p !== undefined);
 
+    // 계획이나 설정이 담당을 못박아 뒀으면 교차 검증 휴리스틱을 적용하지 않는다.
+    const explicit = Boolean(task.providers ?? opts.routes?.[task.role]);
     const routed = route({
       role: task.role,
       available: opts.available,
+      explicit,
+      ...(opts.routes ? { routes: opts.routes } : {}),
       ...(task.providers ? { preferred: task.providers } : {}),
-      ...(avoid.length > 0 && task.role === 'review' ? { avoid } : {}),
+      ...(!explicit && avoid.length > 0 && task.role === 'review' ? { avoid } : {}),
     });
 
     if (!routed) {
