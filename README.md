@@ -5,7 +5,7 @@
 
 전체 설계는 [docs/SPEC.md](docs/SPEC.md) 참조.
 
-**현재 상태: M2 완료** — 워커를 전용 git worktree에서 돌린다. 같은 과제를 여러 벤더에 뿌리고 결과를 비교할 수 있으며, 원본 저장소는 건드리지 않는다.
+**현재 상태: M3 완료** — 워커가 전용 git worktree에서 돌아가고, 지시가 애매하면 **되묻는다.** 완료는 워커의 명시적 보고 + 오케스트레이터의 판정으로 확정된다.
 
 ---
 
@@ -87,6 +87,8 @@ resume conductor run --agent claude --resume 6b3cc4ec-... "..."
 | `--json` | 정규화 이벤트를 JSONL로 출력 |
 | `-w, --workspace` | 전용 git worktree를 만들어 그 안에서 워커를 돌린다 |
 | `--clean-empty` | 변경이 없으면 실행 후 worktree를 자동 정리 |
+| `-P, --protocol` | 워커 협약을 켠다 (되묻기 + 완료 보고 + 정산) |
+| `--auto-answer` | 워커 질문에 사람 대신 자동 응답 (무인 실행용) |
 | `-y, --yolo` | 도구 승인 프롬프트 자동 승인 (`--workspace`와 함께 쓸 것) |
 | `--no-isolate` | 호스트 컨텍스트 격리 해제 (비용 7.7배) |
 
@@ -157,6 +159,69 @@ pnpm dev workspace rm <id> --cwd <repo> -f    # 확인 후 강제 제거
 **요구사항**: 대상이 git 저장소여야 하고 커밋이 최소 하나 있어야 한다. 아니면 명확히 거부한다 —
 조용히 원본에서 돌리는 일은 없다.
 
+## 워커 협약
+
+`--protocol`을 주면 워커에게 **되묻는 방법과 보고하는 방법**을 프롬프트 앞에 붙여 알려준다.
+
+```bash
+pnpm dev run --agent claude --mode write --workspace --yolo --protocol --cwd $REPO   "package.json에 license 필드를 추가하라."
+```
+
+지시가 애매하면 워커가 추측하지 않고 물어본다.
+
+```
+  ? 워커가 질문했습니다
+    package.json에 추가할 license 필드 값을 무엇으로 할까요? 저장소에 LICENSE 파일이 없어 기준이 없습니다.
+    선택지: MIT / ISC / Apache-2.0 / UNLICENSED
+    답변> MIT
+
+  ⚙ Write → package.json
+
+success  elapsed 28.4s  cost $0.0912
+report package.json에 코디네이터가 지정한 대로 "license": "MIT" 필드를 추가했다. ...
+asked 질문 1건 처리
+files 1개 변경  · package.json
+```
+
+### 워커가 쓰는 명령
+
+프롬프트 프리앰블로 안내되며, 워커가 셸에서 호출한다. 사람이 직접 칠 일은 없다.
+
+| 명령 | 역할 |
+|---|---|
+| `worker done --outcome succeeded\|failed --body "<3문장>"` | 완료 보고 (필수, 정확히 한 번) |
+| `worker ask --question "..." --options "a,b"` | 질문하고 답이 올 때까지 대기 |
+| `worker escalate --subject "..." --body "..."` | 완료 전 막힘 보고 |
+| `worker check` | 코디네이터 후속 지시 확인 |
+| `worker heartbeat --phase "..."` | 생존 신호 (진행의 증거는 아님) |
+
+### 완료 판정
+
+**워커의 보고는 주장이고, 판정은 오케스트레이터가 한다.**
+
+| 상황 | 결과 |
+|---|---|
+| `worker done --outcome succeeded` | success (settlement=released) |
+| `worker done --outcome failed` | error (retained) |
+| **보고 없이 종료** | **error** — 프로세스가 0으로 끝나도 완료로 치지 않는다 |
+| succeeded인데 변경 파일 0개 (write 모드) | success + 경고 |
+
+다른 dispatch의 ID로 보고하면 거부한다. 실패한 이전 시도의 늦은 보고가 현재 재시도를
+완료 처리하는 걸 막기 위해서다.
+
+### 실행 기록
+
+`<repo>/.conductor/runs/<runId>/` 에 남는다. 전부 JSON이라 `cat`으로 읽을 수 있다.
+
+```
+run.json                 목표
+tasks/<taskId>.json      할 일
+dispatches/<id>.json     시도 + 정산 결과
+messages/<id>.json       워커가 보낸 메시지
+replies/<msgId>.json     코디네이터의 답변
+bin/conductor(.cmd)      워커가 호출하는 실행 심
+```
+
 ## 픽스처 수집
 
 어댑터의 `buildArgv()`가 만든 커맨드를 실제로 실행해 원시 JSONL을 `fixtures/`에 덤프한다.
@@ -183,7 +248,8 @@ src/
 ├── index.ts                CLI 진입점
 ├── commands/
 │   ├── doctor.ts           사전 점검
-│   ├── run.ts              워커 실행 + 렌더링
+│   ├── run.ts              워커 실행 + 렌더링 + 정산
+│   ├── worker.ts           워커가 호출하는 명령 (워커 전용)
 │   └── workspace.ts        작업 공간 조회·정리
 ├── adapters/               벤더별 CLI 문법·이벤트 흡수
 │   ├── types.ts            AgentAdapter 계약
@@ -193,7 +259,13 @@ src/
 │   └── manager.ts          spawn → 라인 분해 → 정규화 이벤트 스트리밍
 ├── protocol/
 │   ├── events.ts           AgentEvent 스키마 (프로젝트의 계약)
+│   ├── orchestration.ts    Run · Task · Dispatch · 메시지 타입
+│   ├── preamble.ts         워커에게 협약을 알려주는 프롬프트
 │   └── provider.ts         Provider · TaskRequest
+├── orchestration/
+│   ├── coordinator.ts      워커 메시지 수신 + 질문 중계
+│   └── shim.ts             워커가 호출할 conductor 실행 심
+├── store/run-store.ts      파일 기반 Run 저장소 (원자적 rename)
 ├── workspace/
 │   ├── git.ts              git 호출 + porcelain 파서
 │   └── worktree.ts         워커 전용 worktree 생성·수집·정리
@@ -219,6 +291,11 @@ tests/                      픽스처 기반 골든 테스트
 
 전부 실행으로 확인한 것들이다. 자세한 수치는 [SPEC §5.2](docs/SPEC.md) 참조.
 
+- 🔴 **Windows에서 여러 줄 프롬프트를 argv로 넘기면 첫 줄만 도착한다.** npm `.cmd` 심이
+  cmd.exe를 거치는데 개행이 명령 종료로 해석된다. 게다가 exit 0이라 조용히 지나간다.
+  claude·gemini·codex는 프롬프트를 **stdin으로** 넘긴다(`promptDelivery`).
+  `tests/prompt-delivery.test.ts`에 플랫폼 카나리아를 뒀다.
+- **워커가 프로세스 종료로 완료를 알리게 두지 말 것.** 명시적 `worker done`이 없으면 실패로 판정한다.
 - **`--yolo`는 `--workspace`와 함께 쓸 것.** 안전 경계는 프롬프트가 아니라 디렉토리다.
   `--workspace` 없이 `--yolo`를 주면 워커가 원본에서 바로 작업한다.
 - **agy는 아무 일도 안 하고 `SUCCESS`를 반환할 수 있다.** 헤드리스에 승인자가 없으면 도구가 전부

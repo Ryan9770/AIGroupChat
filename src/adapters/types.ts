@@ -23,6 +23,17 @@ export interface HeadlessCapability {
    * false면 사전 등록(전역 설정)이 필요하다 — M3 공유 버스 설계에 직결된다.
    */
   readonly mcpInjection: 'per-invocation' | 'pre-registered' | 'unknown';
+  /**
+   * 프롬프트를 어떻게 넘기는가.
+   *
+   * 🔴 Windows에서 npm이 깐 `.cmd` 심을 거치는 CLI(claude·gemini·codex)는
+   * **인자 안의 줄바꿈에서 잘린다.** cmd.exe가 개행을 명령 종료로 보기 때문이다.
+   * 게다가 exit 0으로 조용히 성공한 척한다(실측). 여러 줄 프롬프트를 쓰려면
+   * 반드시 stdin으로 넘겨야 한다.
+   *
+   * 네이티브 실행 파일(agy.exe)은 개행이 보존되므로 argv로 넘겨도 된다.
+   */
+  readonly promptDelivery: 'argv' | 'stdin';
 }
 
 /** preflight 결과. 자격증명 값은 절대 담지 않는다. §9.1 */

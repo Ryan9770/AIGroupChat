@@ -37,19 +37,29 @@ export async function* runAgent(
   const ctx: ParseContext = {};
   const startedAt = Date.now();
 
+  // 🔴 Windows에서 npm이 깐 `.cmd` 심을 거치는 CLI는 **argv 안의 개행에서 잘린다.**
+  // cmd.exe가 개행을 명령 종료로 보기 때문이고, exit 0으로 조용히 성공한 척한다.
+  // 여러 줄 프롬프트(협약 프리앰블 포함)를 쓰려면 stdin으로 넘겨야 한다.
+  const viaStdin = adapter.capability.promptDelivery === 'stdin';
+
   const sub = execa(bin, args, {
     cwd: req.cwd,
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...env, ...(req.env ?? {}) },
     reject: false,
     shell: false,
     windowsHide: true,
-    // claude는 stdin이 열려 있으면 파이프 입력을 3초 기다린다. 닫아서 없앤다.
-    stdin: 'ignore',
+    // stdin을 쓰지 않을 때는 닫는다. 열어두면 claude가 파이프 입력을 3초 기다린다.
+    stdin: viaStdin ? 'pipe' : 'ignore',
     // 스트리밍이 목적이므로 버퍼링하지 않는다.
     buffer: false,
     timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     ...(opts.signal ? { cancelSignal: opts.signal } : {}),
   });
+
+  if (viaStdin) {
+    // 프롬프트를 넣고 곧바로 닫는다. 닫지 않으면 워커가 더 올 입력을 기다린다.
+    sub.stdin?.end(req.prompt);
+  }
 
   let stderr = '';
   sub.stderr?.on('data', (chunk: Buffer | string) => {

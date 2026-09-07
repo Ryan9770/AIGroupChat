@@ -2,6 +2,13 @@
 import { Command } from 'commander';
 import { doctor } from './commands/doctor.js';
 import { run } from './commands/run.js';
+import {
+  workerAsk,
+  workerCheck,
+  workerDone,
+  workerEscalate,
+  workerHeartbeat,
+} from './commands/worker.js';
 import { workspaceList, workspaceRemove } from './commands/workspace.js';
 import { PROVIDERS } from './protocol/provider.js';
 
@@ -40,6 +47,12 @@ program
   .option('--json', '정규화 이벤트를 JSONL로 출력한다', false)
   .option('--no-isolate', '호스트 프로젝트 컨텍스트 격리를 끈다 (비용이 크게 는다)')
   .option('-w, --workspace', '전용 git worktree를 만들어 그 안에서 워커를 돌린다', false)
+  .option(
+    '-P, --protocol',
+    '워커 협약을 켠다: 프리앰블 주입 + worker done/ask 수신 + 정산',
+    false,
+  )
+  .option('--auto-answer', '워커 질문에 사람 대신 자동 응답한다 (무인 실행용)', false)
   .option('--clean-empty', '변경이 없으면 실행 후 worktree를 자동 정리한다', false)
   .option(
     '-y, --yolo',
@@ -61,6 +74,8 @@ program
         yolo: boolean;
         workspace: boolean;
         cleanEmpty: boolean;
+        protocol: boolean;
+        autoAnswer: boolean;
       },
     ) => {
       if (opts.mode !== 'plan' && opts.mode !== 'write') {
@@ -78,6 +93,10 @@ program
         autoApprove: opts.yolo,
         workspace: opts.workspace,
         cleanEmpty: opts.cleanEmpty,
+        protocol: opts.protocol,
+        // 파이프로 답을 넣는 경우도 사람 모드로 본다.
+        // stdin이 EOF면 Coordinator가 알아서 자동 응답으로 떨어진다.
+        answerMode: opts.autoAnswer ? ('auto' as const) : ('human' as const),
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.resume ? { resume: opts.resume } : {}),
       });
@@ -105,6 +124,98 @@ workspace
   .option('-f, --force', '커밋되지 않은 변경이 있어도 제거한다', false)
   .action(async (id: string, opts: { cwd: string; force: boolean }) => {
     process.exitCode = await workspaceRemove(opts.cwd, id, opts.force);
+  });
+
+// 워커 프로세스가 셸에서 호출하는 명령들. 사람이 직접 칠 일은 없다.
+const worker = program
+  .command('worker')
+  .description('배치된 워커가 코디네이터와 소통하는 명령 (워커 전용)');
+
+worker
+  .command('done')
+  .description('작업 결과를 보고한다 (필수, 정확히 한 번)')
+  .requiredOption('--outcome <outcome>', 'succeeded | failed')
+  .requiredOption('--body <text>', '3문장 요약: 무엇을 했고/발견했고/남았는지')
+  .option('--subject <text>', '짧은 상태 문구')
+  .option('--files-modified <list>', '쉼표로 구분한 변경 파일')
+  .option('--task-id <id>', '배치받은 task ID')
+  .option('--dispatch-id <id>', '배치받은 dispatch ID')
+  .action(
+    async (opts: {
+      outcome: string;
+      body: string;
+      subject?: string;
+      filesModified?: string;
+      taskId?: string;
+      dispatchId?: string;
+    }) => {
+      if (opts.outcome !== 'succeeded' && opts.outcome !== 'failed') {
+        process.stderr.write('--outcome은 succeeded 또는 failed여야 합니다.\n');
+        process.exitCode = 2;
+        return;
+      }
+      process.exitCode = await workerDone({
+        outcome: opts.outcome,
+        body: opts.body,
+        ...(opts.subject ? { subject: opts.subject } : {}),
+        ...(opts.filesModified
+          ? { filesModified: opts.filesModified.split(',').map((s) => s.trim()).filter(Boolean) }
+          : {}),
+        ...(opts.taskId ? { taskId: opts.taskId } : {}),
+        ...(opts.dispatchId ? { dispatchId: opts.dispatchId } : {}),
+      });
+    },
+  );
+
+worker
+  .command('ask')
+  .description('코디네이터에게 질문하고 답이 올 때까지 기다린다')
+  .requiredOption('--question <text>', '질문')
+  .option('--options <list>', '쉼표로 구분한 선택지')
+  .option('--timeout-ms <ms>', '대기 시간', '600000')
+  .action(async (opts: { question: string; options?: string; timeoutMs: string }) => {
+    process.exitCode = await workerAsk({
+      question: opts.question,
+      timeoutMs: Number(opts.timeoutMs),
+      ...(opts.options
+        ? { options: opts.options.split(',').map((s) => s.trim()).filter(Boolean) }
+        : {}),
+    });
+  });
+
+worker
+  .command('escalate')
+  .description('완료 전에 막힌 상황을 알린다')
+  .requiredOption('--subject <text>', '막힌 이유')
+  .requiredOption('--body <text>', '상세')
+  .option('--task-id <id>')
+  .option('--dispatch-id <id>')
+  .action(
+    async (opts: { subject: string; body: string; taskId?: string; dispatchId?: string }) => {
+      process.exitCode = await workerEscalate({
+        subject: opts.subject,
+        body: opts.body,
+        ...(opts.taskId ? { taskId: opts.taskId } : {}),
+        ...(opts.dispatchId ? { dispatchId: opts.dispatchId } : {}),
+      });
+    },
+  );
+
+worker
+  .command('heartbeat')
+  .description('생존 신호. 진행의 증거는 아니다')
+  .option('--phase <text>', 'investigating | implementing | reviewing | waiting', 'working')
+  .action(async (opts: { phase: string }) => {
+    process.exitCode = await workerHeartbeat(opts.phase);
+  });
+
+worker
+  .command('check')
+  .description('코디네이터의 후속 지시를 확인한다')
+  .option('--task-id <id>')
+  .option('--dispatch-id <id>')
+  .action(async () => {
+    process.exitCode = await workerCheck();
   });
 
 await program.parseAsync(process.argv);

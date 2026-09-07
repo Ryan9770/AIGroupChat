@@ -324,6 +324,7 @@ Antigravity는 최상위 `event`로 판별하고 실제 내용은 동명의 중�
 | 워커 1회 호출에 캐시 생성 토큰 46,277, $0.46 | 워커가 호스트의 CLAUDE.md·MCP·훅·스킬을 전부 상속 | §5.2.1 격리 플래그 | ✅ 해소 |
 | **agy가 아무 일도 안 하고 `status: SUCCESS` 반환** | 헤드리스에 승인자가 없어 도구가 전부 거부됨 | §5.2.2 | ✅ 해소 |
 | **agy `--mode plan`이 토큰을 4배 태움** | agy의 plan은 읽기 전용이 아니라 계획 수립 워크플로우 | §5.2.3 | ✅ 해소 |
+| 🔴 **여러 줄 프롬프트가 통째로 사라짐 (Windows)** | npm `.cmd` 심을 거치면 argv의 개행에서 잘린다 | §5.2.5 | ✅ 해소 |
 
 #### 5.2.1 워커 컨텍스트 격리 — 비용 7.7배 차이
 
@@ -381,6 +382,41 @@ claude는 매 턴 쿼터 상태를 **실패 전에** 흘려준다:
 ```
 
 R2(쿼터 페일오버)를 **반응형이 아니라 예측형**으로 설계할 수 있다는 뜻이다. 어댑터는 여러 창 중 가장 압박이 큰 것(= 먼저 막힐 것)을 골라 `rate_limit` 이벤트로 정규화한다.
+
+### 5.2.5 🔴 Windows에서 여러 줄 프롬프트가 조용히 잘린다
+
+M3에서 협약 프리앰블(1,400자, 여러 줄)을 붙였더니 워커가 **"과제 내용이 보이지 않습니다"** 라고 답했다.
+`in 2` 토큰이 단서였다 — 프롬프트가 아예 도착하지 않은 것이다.
+
+LLM 호출 없이 재현한 결과:
+
+| 실행 경로 | 보낸 인자 | 워커가 받은 인자 |
+|---|---|---|
+| `.cmd` 배치 파일 (claude·gemini·codex) | `"LINE-ONE
+LINE-TWO
+LINE-THREE"` | **`["LINE-ONE"]`** |
+| 네이티브 `.exe` (agy) | 같음 | `["LINE-ONE
+LINE-TWO
+LINE-THREE"]` |
+
+npm이 설치하는 CLI는 Windows에서 `claude.cmd` 같은 배치 파일 심이다. spawn하면 cmd.exe를 거치고,
+**cmd.exe는 개행을 명령 종료로 해석한다.** 첫 줄 뒤는 전부 버려지고 **종료 코드는 0** — 조용히 성공한 척한다.
+
+이건 프리앰블만의 문제가 아니다. **사용자가 여러 줄 프롬프트를 주면 언제나 깨진다.**
+
+**대응**: `HeadlessCapability.promptDelivery`를 도입했다.
+
+| provider | 실행 파일 | promptDelivery |
+|---|---|---|
+| claude / gemini / codex | npm `.cmd` 심 | **`stdin`** |
+| antigravity | 네이티브 `agy.exe` | `argv` (개행 보존 실측) |
+
+`stdin`인 어댑터는 `buildArgv()`에서 프롬프트를 빼고, Process Manager가 stdin에 써 넣고 닫는다.
+부수 효과로 claude의 3초 stdin 대기도 자연히 사라진다.
+
+`tests/prompt-delivery.test.ts`에 **플랫폼 카나리아**를 뒀다. Windows 동작이 바뀌면 그 테스트가 먼저 알려준다.
+
+---
 
 ### 5.3 어댑터 인터페이스
 
@@ -544,6 +580,106 @@ const changes = workspace ? await collectChanges(workspace) : undefined;
 ```
 
 워커가 "다 했다"고 해도 파일이 안 바뀌었으면 안 바뀐 것이다. ADR-9의 판정 재료가 여기서 나온다.
+
+---
+
+## 5.7 워커 협약 구현 (M3)
+
+§5.4에서 설계한 협약을 구현했다. Orca와 같은 뼈대이되, 전달·저장 방식은 우리 규모에 맞췄다.
+
+### 5.7.1 구성
+
+| 요소 | 구현 |
+|---|---|
+| 협약 주입 | 프롬프트 프리앰블 (`src/protocol/preamble.ts`) |
+| 정체성 전달 | 환경변수 `CONDUCTOR_RUN_DIR` / `_TASK_ID` / `_DISPATCH_ID` / `_WORKER` |
+| 워커 → 코디네이터 | 워커가 셸에서 `conductor worker ...` 호출 |
+| 실행 심 | run 디렉토리에 `conductor.cmd` / `conductor` 생성 (worktree 밖 — diff 오염 방지) |
+| 메시지 저장 | 파일 디렉토리 + 원자적 rename (§5.7.2) |
+| 블로킹 `ask` | 워커가 답변 파일을 폴링 |
+
+### 5.7.2 왜 SQLite가 아니라 파일인가
+
+- 오케스트레이터와 워커는 **서로 다른 프로세스**다. 파일 + 원자적 rename이면 락 없이 안전하다.
+- 실행당 메시지가 몇 건 수준이라 쿼리 엔진이 불필요하다.
+- 에이전트 프로토콜은 디버깅이 어렵다. `cat`으로 바로 들여다볼 수 있는 게 크다.
+- `node:sqlite`는 아직 실험적이고, `better-sqlite3`는 Windows 네이티브 빌드가 필요하다.
+- 소켓/포트를 열면 Windows 방화벽·포트 충돌·정리 실패가 따라온다. 폴링이 실패 모드가 적다.
+
+이벤트 로그처럼 질의가 필요해지면 그때 SQLite를 얹는다.
+
+### 5.7.3 프롬프트 구조 — 과제가 협약에 묻히면 안 된다
+
+처음엔 Orca와 같은 순서(협약 → 과제)로 뒀다가 실패했다. 워커가 과제 바로 위의
+"보고 후 멈춰라"에 걸려 **"지시가 없다"** 고 답했다. 협약 문서가 과제를 덮어버린 것이다.
+
+→ **과제를 맨 앞에 두고, 끝에서 한 번 더 확인시킨다.**
+
+```
+=== 과제 ===
+{과제}
+지금 이 과제를 수행하세요. 아래는 수행 방법이 아니라 결과를 보고하는 방법입니다.
+---
+{정체성 + 명령 목록 + 규칙}
+---
+지금 할 일: {과제}
+끝나면 반드시 `worker done`으로 보고하세요.
+```
+
+Orca는 프리앰블을 대화형 터미널에 보내고 과제가 별도 입력으로 이어지지만,
+우리는 단일 `-p` 프롬프트라 순서가 그대로 영향을 준다.
+
+### 5.7.4 실측 검증
+
+과제: `"package.json에 license 필드를 추가하라."` — 어떤 라이선스인지 명시하지 않은 **의도적으로 애매한 지시**.
+
+```
+? 워커가 질문했습니다
+  package.json에 추가할 license 필드 값을 무엇으로 할까요? 저장소에 LICENSE 파일이 없어 기준이 없습니다.
+  선택지: MIT / ISC / Apache-2.0 / UNLICENSED
+  답변> MIT 라이선스로 하세요.
+
+⚙ Write → package.json
+⚙ Bash  → 완료 보고를 기록했습니다 (succeeded)
+
+success  elapsed 28.4s  cost $0.0912
+report package.json에 코디네이터가 지정한 대로 "license": "MIT" 필드를 추가했다.
+       저장소에 LICENSE 파일이 없어 라이선스 기준을 확인차 물었고 MIT로 답변받았다.
+       변경은 package.json 한 줄 추가뿐이며 커밋은 하지 않았고 남은 작업은 없다.
+asked 질문 1건 처리
+files 1개 변경  · package.json
+```
+
+디스크에 남은 정산 기록:
+
+```json
+{ "provider": "claude", "attempt": 1, "workspaceId": "claude-write-j5z00",
+  "outcome": "succeeded", "settlement": "released",
+  "filesChanged": ["package.json"] }
+```
+
+**워커가 추측하지 않고 되물었다.** 사용자가 원한 "대화" 기능이 자유 대화방 없이 성립한다.
+
+### 5.7.5 정산 규칙 (ADR-9 구현)
+
+| 상황 | outcome | status |
+|---|---|---|
+| `worker_done(succeeded)` | `succeeded` | success (settlement=released) |
+| `worker_done(failed)` | `failed` | error (retained) |
+| **worker_done 없이 종료** | `no_completion` | **error** (retained) |
+| 사용자 취소 | `cancelled` | cancelled |
+
+프로세스가 0으로 끝나도 완료 보고가 없으면 성공으로 치지 않는다. 실측 확인:
+
+```
+report 워커가 worker done 없이 종료했습니다 — 완료로 인정하지 않습니다.
+```
+
+추가로, `succeeded`라고 보고했는데 write 모드에서 **변경된 파일이 0개**면 경고를 붙인다.
+판정 근거는 워커의 말이 아니라 `git status`다.
+
+또한 워커가 **다른 dispatch의 ID**로 보고하면 거부한다(exit 2). 실패한 이전 시도의 늦은 보고가
+현재 재시도를 완료 처리하는 걸 막는다. ADR-8
 
 ---
 
@@ -768,7 +904,7 @@ export default defineConfig({
 | **M1** ✅ | 단일 어댑터 수직 관통 | Process Manager, `parseLine`(claude·antigravity), 격리·autoApprove, `conductor run`, 골든 테스트 22개 | **완료** — 두 벤더 실시간 스트리밍, 비용 $0.46→$0.0262, agy 조용한 실패 검출, exit code 0/1/2 검증 |
 | **M2** ✅(부분) | **워크스페이스 격리** | `src/workspace/`, `conductor run --workspace`, `conductor workspace list\|rm`, 테스트 11개 | **완료** — 두 벤더가 같은 파일을 각자 사본에서 수정, `--yolo`로 돌려도 원본 `git status` 무변. §5.6 |
 | **M2a** | 나머지 어댑터 + 정규화 확정 | gemini·codex `parseLine` + 픽스처 | 4개 CLI 전부 실측 JSONL 덤프 확보. vitest가 픽스처→정규화 이벤트 변환을 전부 통과. codex 인증 프로브 구현 |
-| **M3** | 워커 협약 | Dispatch 프리앰블 + `conductor worker ask\|done\|check` + Run/Task/Dispatch 저장소 | 워커가 `ask`로 질문하고 블록 → 오케스트레이터가 답하면 재개. `worker_done` 없이 종료한 워커는 실패로 판정 |
+| **M3** ✅ | 워커 협약 | 프리앰블, `conductor worker done\|ask\|escalate\|heartbeat\|check`, 파일 기반 Run/Task/Dispatch 저장소, 정산 | **완료** — 워커가 애매한 지시에 되묻고 답을 받아 수행. worker_done 없는 종료는 error로 판정. Windows argv 개행 잘림 발견·해소. 테스트 46개 |
 | **M4** | DAG 스케줄러 + 정산 | Planner/Scheduler/Router + release·retain | "설계→구현→리뷰" 3노드 DAG가 서로 다른 3개 벤더에서 실행. 각 Task가 정산되어야 다음으로 넘어감 |
 | **M5** | Governor & 페일오버 | 쿼터 추적, 재라우팅 | `fake-agent`로 쿼터 소진을 시뮬레이션 → 자동으로 다음 벤더로 넘어가는 것을 테스트로 증명 |
 | **M6** | 관측 UI | Ink TUI 대시보드 | 실행 중 각 워커의 상태·토큰·경과시간이 실시간 갱신 |
@@ -811,6 +947,7 @@ export default defineConfig({
 | 날짜 | 버전 | 변경 | 사유 |
 |---|---|---|---|
 | 2026-09-07 | v0.1 | 최초 작성 | 프로젝트 착수 스펙 정의 |
+| 2026-09-07 | v0.5 | M3 워커 협약 구현: §5.7(프리앰블·파일 저장소·정산 실측), §5.2.5 Windows `.cmd` argv 개행 잘림 발견 및 `promptDelivery` 도입 | 사용자가 원한 "에이전트가 되묻는" 기능을 자유 대화방 없이 구현 |
 | 2026-09-07 | v0.4 | Orca(MIT) 소스 조사 반영: §5.4 워커 협약(프리앰블 주입 방식 실측 확인), §5.5 Run/Task/Dispatch 데이터 모델, ADR-7·8·9 추가, ADR-3(MCP 주입) 폐기. §5.6 워크스페이스 격리 구현·검증 | 사용자 제안(에이전트 간 대화)의 안전한 형태를 찾고, `--yolo`의 안전 경계를 먼저 세움 |
 | 2026-09-07 | v0.3 | M1 실측 반영: §5.1 claude tool/rate_limit 매핑 확정, §5.2 실행 함정 4건 정리(격리 비용 7.7배·agy 조용한 실패·agy plan 오해·rate_limit 예측형 활용), §10 M1 완료 | 실행 검증에서 나온 벤더 semantic 차이를 계약에 반영 |
 | 2026-09-07 | v0.2 | M0 실측 반영: §2 헤드리스 표 정정(agy·gemini의 `-p`는 값 플래그), §2.1 4개 벤더 모두 설치 확인, §2.2 인증 프로브 추가, §5.1 claude·antigravity 이벤트 구조 실측 확정, §5.2 실행 함정 추가 | 문서 조사 기반 가설을 실행 검증 결과로 대체 |

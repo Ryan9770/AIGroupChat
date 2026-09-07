@@ -43,4 +43,11 @@ export interface TaskRequest {
    * 격리 없이 켜면 워커가 호스트 파일시스템에 그대로 손을 댄다.
    */
   autoApprove?: boolean;
+  /**
+   * 워커 프로세스에 추가로 넣을 환경변수.
+   *
+   * 워커 협약의 정체성(run/task/dispatch ID)이 이 경로로 전달된다.
+   * 자격증명은 절대 넣지 않는다. SPEC §9.1
+   */
+  env?: Record<string, string>;
 }

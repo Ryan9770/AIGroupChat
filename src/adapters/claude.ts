@@ -38,6 +38,7 @@ export class ClaudeAdapter implements AgentAdapter {
     streamJson: true,
     structuredOutput: true, // --json-schema
     resume: 'stdin-stream', // --input-format stream-json
+    promptDelivery: 'stdin' as const, // npm .cmd 심 경유 → argv 개행 잘림
     mcpInjection: 'per-invocation', // --mcp-config
   };
 
@@ -136,9 +137,8 @@ export class ClaudeAdapter implements AgentAdapter {
     if (req.model) args.push('--model', req.model);
     if (req.resumeId) args.push('--resume', req.resumeId);
 
-    // 프롬프트는 마지막 위치 인자. (agy/gemini와 달리 값 플래그가 아니다)
-    args.push(req.prompt);
-
+    // 프롬프트는 argv가 아니라 stdin으로 간다. capability.promptDelivery 참조.
+    // Windows npm 심(.cmd)을 거치면 argv의 개행에서 잘리기 때문이다.
     return { bin: this.bin, args, env: {} };
   }
 

@@ -16,6 +16,7 @@ export class GeminiAdapter implements AgentAdapter {
     streamJson: true, // -o stream-json
     structuredOutput: false, // --json-schema / --output-schema 없음
     resume: 'respawn-with-id', // --session-id / --resume
+    promptDelivery: 'stdin' as const, // npm .cmd 심 경유 → argv 개행 잘림
     mcpInjection: 'pre-registered', // `gemini mcp` 서브커맨드
   };
 
@@ -65,8 +66,10 @@ export class GeminiAdapter implements AgentAdapter {
   }
 
   buildArgv(req: TaskRequest): Argv {
-    // gemini의 -p는 값을 받는다. 프롬프트가 위치 인자가 아니라 플래그 값이다.
-    const args = ['-p', req.prompt, '-o', 'stream-json'];
+    // gemini의 -p는 값을 받지만, 값을 비우고 프롬프트는 stdin으로 넘긴다.
+    // (`-p`의 도움말: "Appended to input on stdin (if any)")
+    // Windows npm 심(.cmd)을 거치면 argv의 개행이 잘리기 때문이다.
+    const args = ['-p', '', '-o', 'stream-json'];
 
     args.push('--approval-mode', req.mode === 'plan' ? 'plan' : 'auto_edit');
 

@@ -19,6 +19,7 @@ export class CodexAdapter implements AgentAdapter {
     streamJson: true, // --json (JSONL)
     structuredOutput: true, // --output-schema <file>
     resume: 'respawn-with-id', // codex exec resume --last | <id>
+    promptDelivery: 'stdin' as const, // npm .cmd 심 경유. 미실측 — M2a에서 확인
     mcpInjection: 'unknown', // 미검증
   };
 
@@ -62,12 +63,12 @@ export class CodexAdapter implements AgentAdapter {
       // codex는 resume이 서브커맨드다: codex exec resume <id> "prompt"
       return {
         bin: this.bin,
-        args: ['exec', 'resume', req.resumeId, '--json', req.prompt],
+        args: ['exec', 'resume', req.resumeId, '--json'],
         env: {},
       };
     }
 
-    args.push(req.prompt);
+    // 프롬프트는 stdin으로. capability.promptDelivery 참조. (미실측 — M2a에서 확인)
     return { bin: this.bin, args, env: {} };
   }
 
