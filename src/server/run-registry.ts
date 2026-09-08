@@ -10,12 +10,25 @@ import type { PendingQuestion } from '../orchestration/coordinator.js';
  */
 export type UiEvent =
   | { type: 'log'; text: string }
+  | { type: 'discussion.turn.start'; turn: number; totalTurns: number; provider: string; role: string }
+  | { type: 'discussion.turn.end'; turn: number; provider: string; role: string; text: string; error?: string }
+  | { type: 'discussion.summary.start'; provider: string }
+  | { type: 'discussion.summary.end'; provider: string; text: string }
   | { type: 'task.start'; taskId: string; provider: string; reason: string }
   | { type: 'task.end'; taskId: string; state: string; note?: string; files: number }
   | { type: 'failover'; taskId: string; from: string; to: string; reason: string }
   | { type: 'question'; questionId: string; question: string; options: string[] }
   | { type: 'question.answered'; questionId: string }
-  | { type: 'usage'; costUsd?: number; inputTokens: number; outputTokens: number }
+  | {
+      type: 'usage';
+      provider?: string;
+      costUsd?: number;
+      inputTokens: number;
+      outputTokens: number;
+      cacheCreationTokens?: number;
+      cacheReadTokens?: number;
+      thinkingTokens?: number;
+    }
   | { type: 'done'; ok: boolean; summary: unknown }
   | { type: 'error'; message: string };
 
@@ -26,7 +39,7 @@ interface PendingAnswer {
 
 export interface RunRecord {
   id: string;
-  kind: 'run' | 'plan';
+  kind: 'run' | 'plan' | 'discussion';
   label: string;
   startedAt: number;
   finishedAt?: number;

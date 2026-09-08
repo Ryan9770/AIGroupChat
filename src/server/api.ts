@@ -4,11 +4,13 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allAdapters, getAdapter } from '../adapters/registry.js';
 import { loadConfig } from '../core/config.js';
+import { DiscussionError, runDiscussion } from '../core/discussion.js';
 import { DispatchConfigError, executeDispatch } from '../core/dispatch.js';
 import { Governor } from '../core/governor.js';
 import { DEFAULT_ROUTES, route } from '../core/router.js';
 import { runPlan, SchedulerError } from '../core/scheduler.js';
 import { Plan, topoOrder, validatePlan, type Routes } from '../protocol/plan.js';
+import { DiscussionSpec } from '../protocol/discussion.js';
 import type { Provider } from '../protocol/provider.js';
 import { createRun, newTaskId } from '../store/run-store.js';
 import { git, findRepoRoot } from '../workspace/git.js';
@@ -385,6 +387,104 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
         });
       } catch (err) {
         const message = err instanceof SchedulerError ? err.message : String(err);
+        emit({ type: 'error', message });
+        registry.finish(record.id, false, { error: message });
+      }
+    })();
+
+    return { runId: record.id };
+  });
+
+  // ── 구조화 모델 토론 ────────────────────────────────────────────────────
+  app.post('/api/discussion/run', async (request, reply) => {
+    const body = request.body as { discussion?: unknown; cwd?: string };
+    const parsed = DiscussionSpec.safeParse(body.discussion);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: '토론 설정이 올바르지 않습니다',
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.join('.') || '(root)',
+          message: issue.message,
+        })),
+      });
+    }
+
+    const discussion = parsed.data;
+    const cwd = resolve(body.cwd ?? opts.defaultCwd);
+    const available = await availableProviders();
+    const required = new Set([
+      ...discussion.participants.map((participant) => participant.provider),
+      discussion.scribe.provider,
+    ]);
+    const unavailable = [...required].filter((provider) => !available.includes(provider));
+    if (unavailable.length > 0) {
+      return reply.code(400).send({
+        error: `설치 및 로그인이 확인되지 않은 provider: ${unavailable.join(', ')}`,
+      });
+    }
+
+    const record = registry.create('discussion', discussion.topic.slice(0, 60));
+    const emit = (event: UiEvent) => registry.emit(record.id, event);
+
+    void (async () => {
+      try {
+        const result = await runDiscussion({
+          spec: discussion,
+          cwd,
+          signal: record.controller.signal,
+          timeoutMs: 10 * 60_000,
+          onAgentEvent: (provider, event) => {
+            governor.observeEvent(provider, event);
+            if (event.kind === 'session.finished') governor.observeDispatch(provider);
+            if (event.kind === 'usage') {
+              emit({
+                type: 'usage',
+                provider,
+                inputTokens: event.inputTokens,
+                outputTokens: event.outputTokens,
+                ...(event.cacheCreationTokens !== undefined
+                  ? { cacheCreationTokens: event.cacheCreationTokens }
+                  : {}),
+                ...(event.cacheReadTokens !== undefined
+                  ? { cacheReadTokens: event.cacheReadTokens }
+                  : {}),
+                ...(event.thinkingTokens !== undefined
+                  ? { thinkingTokens: event.thinkingTokens }
+                  : {}),
+                ...(event.costUsd !== undefined ? { costUsd: event.costUsd } : {}),
+              });
+            }
+          },
+          onTurnStart: (turn, totalTurns, participant) =>
+            emit({
+              type: 'discussion.turn.start',
+              turn,
+              totalTurns,
+              provider: participant.provider,
+              role: participant.role,
+            }),
+          onTurnEnd: (turn) =>
+            emit({
+              type: 'discussion.turn.end',
+              turn: turn.number,
+              provider: turn.provider,
+              role: turn.role,
+              text: turn.text,
+              ...(turn.error ? { error: turn.error } : {}),
+            }),
+          onSummaryStart: (provider) => emit({ type: 'discussion.summary.start', provider }),
+          onSummaryEnd: (provider, text) =>
+            emit({ type: 'discussion.summary.end', provider, text }),
+        });
+
+        registry.finish(record.id, true, result);
+      } catch (error) {
+        const message =
+          error instanceof DiscussionError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : String(error);
         emit({ type: 'error', message });
         registry.finish(record.id, false, { error: message });
       }

@@ -1596,6 +1596,10 @@ class RogueliteGame {
     this.minimapCanvas = document.getElementById('minimapCanvas');
     this.minimapCtx = this.minimapCanvas.getContext('2d');
 
+    // 픽셀 아트 스프라이트는 보간 없이 정수 스냅으로 그린다 (아트 바이블 §4.1)
+    if (this.ctx) this.ctx.imageSmoothingEnabled = false;
+    if (this.minimapCtx) this.minimapCtx.imageSmoothingEnabled = false;
+
     this.audio = new RetroAudioEngine();
 
     // State Machine: 'PLAYING' | 'VICTORY' | 'GAME_OVER' | 'LEVEL_UP' | 'SHRINE_EVENT' | 'CLASS_SELECT'
@@ -1626,6 +1630,10 @@ class RogueliteGame {
 
     // Active Shrine Event Data
     this.currentShrine = null;
+
+    // U-02 Merchant / U-04 Relic Synergies (run-scoped, never persisted)
+    this.currentMerchant = null;
+    this.activeSynergyIds = new Set();
 
     // Viewport Camera & Torchlight
     this.camera = { x: 0, y: 0 };
@@ -1691,6 +1699,8 @@ class RogueliteGame {
     this.relics = [];
     this.particles = [];
     this.floatingTexts = [];
+    this.currentMerchant = null;
+    this.activeSynergyIds = new Set();
 
     const classData = CLASS_DEFINITIONS[classId] || CLASS_DEFINITIONS.warrior;
 
@@ -1786,6 +1796,13 @@ class RogueliteGame {
     this.itemsOnFloor = [];
     this.floatingTexts = [];
     this.bossEnraged = false;
+    this.currentMerchant = null;
+
+    // U-02/U-03: dungeon feature layers (order per technical spec)
+    const ownedRelicIds = new Set(this.relics.map((r) => r.id));
+    this.dungeon.generateSecretRoom();
+    this.dungeon.placeMerchant({ ownedRelicIds });
+    this.dungeon.placeTreasureChests();
 
     this.spawnEntities();
     this.dungeon.calculateFOV(this.player.x, this.player.y, this.player.fov);
@@ -1793,8 +1810,15 @@ class RogueliteGame {
     this.updateHUD();
     this.render();
 
+    // U-01: procedural BGM scene transition
+    const isBossFloor = floorNum === 3 || floorNum === 5;
+    this.audio.setScene(isBossFloor ? 'BOSS' : 'FLOOR', { floorNumber: floorNum });
+
     const theme = FLOOR_THEMES[floorNum] || FLOOR_THEMES[1];
     this.log(`📍 심연 ${floorNum}층: [${theme.name}]에 도달했습니다.`, 'log-system');
+    if (this.dungeon.merchant) {
+      this.log('🧙 이 층 어딘가에서 방랑 상인 그리드의 기척이 느껴집니다...', 'log-item');
+    }
     this.showFloorBanner(floorNum);
   }
 
@@ -1834,7 +1858,7 @@ class RogueliteGame {
         const mx = Math.floor(Math.random() * (room.x2 - room.x1 - 1)) + room.x1 + 1;
         const my = Math.floor(Math.random() * (room.y2 - room.y1 - 1)) + room.y1 + 1;
 
-        if (this.dungeon.isWalkable(mx, my)) {
+        if (this.dungeon.isWalkable(mx, my) && !this.dungeon.isTileReserved(mx, my)) {
           const type = this.pickMonsterType();
           this.spawnMonster(type, mx, my);
         }
@@ -1844,7 +1868,7 @@ class RogueliteGame {
       if (Math.random() < 0.65) {
         const ix = Math.floor(Math.random() * (room.x2 - room.x1 - 1)) + room.x1 + 1;
         const iy = Math.floor(Math.random() * (room.y2 - room.y1 - 1)) + room.y1 + 1;
-        if (this.dungeon.isWalkable(ix, iy)) {
+        if (this.dungeon.isWalkable(ix, iy) && !this.dungeon.isTileReserved(ix, iy)) {
           this.spawnItem(ix, iy);
         }
       }
@@ -1906,11 +1930,15 @@ class RogueliteGame {
       burnChance: tmpl.burnChance || 0,
       stunChance: tmpl.stunChance || 0,
       cooldown: 0,
+      isMimic: tmpl.isMimic || false,
+      skipNextTurn: false,
       statusEffects: {
         burn: 0,
         poison: 0,
         freeze: 0,
         stun: 0,
+        bleed: 0,
+        bleedDamage: 0,
       },
       x,
       y,
@@ -1949,6 +1977,21 @@ class RogueliteGame {
 
     const targetX = this.player.x + dx;
     const targetY = this.player.y + dy;
+
+    // U-02: Wandering merchant tile — open the black market, do not step in
+    const merchant = this.dungeon.merchant;
+    if (merchant && merchant.x === targetX && merchant.y === targetY && merchant.state === 'friendly') {
+      this.interactWithMerchant(merchant);
+      return;
+    }
+
+    // U-03: Closed treasure chest — open it in place (may be a mimic)
+    const chest = this.dungeon.chests.find((c) => c.x === targetX && c.y === targetY && !c.opened);
+    if (chest) {
+      this.openChest(chest);
+      this.endTurn();
+      return;
+    }
 
     // Check Monster Target
     const targetMonster = this.monsters.find((m) => m.x === targetX && m.y === targetY);
@@ -2004,6 +2047,9 @@ class RogueliteGame {
     const isCrit = guaranteedCrit || (Math.random() * 100 < critRate);
     let dmg = Math.max(1, Math.floor((totalAtk + (Math.random() * 4 - 2)) * multiplier) - monster.def);
 
+    // Snapshot status BEFORE this hit lands (used by vampire_feast synergy)
+    const bleedingBeforeHit = (monster.statusEffects?.bleed || 0) > 0;
+
     if (isCrit) {
       dmg = Math.floor(dmg * 1.8);
       this.audio.playCrit();
@@ -2011,13 +2057,6 @@ class RogueliteGame {
       this.addFloatingText(monster.x, monster.y, `CRIT! -${dmg}`, '#f1c40f');
       this.createParticles(monster.x, monster.y, '#f1c40f', 12);
       this.log(`💥 치명타! ${monster.name}에게 ${dmg}의 회심의 일격을 가했습니다!`, 'log-attack');
-
-      // Relic: Vampire Fang (25% lifesteal on crit)
-      if (this.hasRelic('vampire_fang')) {
-        const healAmt = Math.max(1, Math.floor(dmg * 0.25));
-        this.player.hp = Math.min(this.getTotalMaxHp(), this.player.hp + healAmt);
-        this.addFloatingText(this.player.x, this.player.y, `+${healAmt} HP`, '#2ecc71');
-      }
     } else {
       this.audio.playPlayerAttack();
       this.addFloatingText(monster.x, monster.y, `-${dmg}`, '#e74c3c');
@@ -2025,8 +2064,31 @@ class RogueliteGame {
       this.log(`${monster.name}을(를) 공격하여 ${dmg}의 피해를 입혔습니다.`, 'log-attack');
     }
 
+    // 1. Apply base (crit-adjusted) damage
     monster.hp -= dmg;
 
+    // 2. Vampire Fang lifesteal on crit (x2 vs bleeding target — 흡혈귀의 연회 세트)
+    if (isCrit && this.hasRelic('vampire_fang')) {
+      this.resolveVampireHeal({ target: monster, damage: dmg, bleedingBeforeHit });
+    }
+
+    // 3. Blood Chalice base effect: crit inflicts 2-turn bleed (4 dmg/turn)
+    if (isCrit && this.hasRelic('blood_chalice') && monster.hp > 0) {
+      monster.statusEffects.bleed = Math.max(monster.statusEffects.bleed || 0, 2);
+      monster.statusEffects.bleedDamage = 4;
+      this.addFloatingText(monster.x, monster.y, '🩸 출혈', '#c0392b');
+    }
+
+    // 4. On-hit relic synergies (dark_empire_legacy: 20% -> +15 dark damage)
+    const onHit = this.resolveOnHitRelicEffects({ target: monster, damage: dmg, isCrit });
+    if (onHit.extraDamage > 0 && monster.hp > 0) {
+      monster.hp -= onHit.extraDamage;
+      this.addFloatingText(monster.x, monster.y, `공허 -${onHit.extraDamage}`, '#8e44ad');
+      this.createParticles(monster.x, monster.y, '#8e44ad', 8);
+      this.log(`🧿 [암흑 제국의 유산] 공허의 촉수가 ${monster.name}에게 ${onHit.extraDamage} 암흑 피해를 가했습니다!`, 'log-attack');
+    }
+
+    // 5. Single death resolution
     if (monster.hp <= 0) {
       this.handleMonsterDeath(monster);
     }
@@ -2092,6 +2154,30 @@ class RogueliteGame {
 
     this.monsters = this.monsters.filter((m) => m.id !== monster.id);
 
+    // U-02: Awakened merchant boss — drop one unsold offer, never triggers Victory
+    if (monster.type === 'shop_guard') {
+      const merchant = this.dungeon.merchant;
+      if (merchant) {
+        merchant.state = 'defeated';
+        const unsold = merchant.stock.filter((o) => !o.sold);
+        if (unsold.length > 0) {
+          const drop = unsold[Math.floor(Math.random() * unsold.length)];
+          drop.sold = true;
+          if (drop.kind === 'relic') {
+            const relic = RELIC_CATALOG.find((r) => r.id === drop.catalogId);
+            if (relic) this.addRelic({ ...relic });
+          } else {
+            const cat = ITEM_CATALOG.find((i) => i.id === drop.catalogId);
+            if (cat && this.addItemToInventory({ ...cat })) {
+              this.log(`🎁 그리드의 유품에서 [${cat.name}]을(를) 챙겼습니다.`, 'log-item');
+            }
+          }
+        }
+      }
+      if (this.player.exp >= this.player.maxExp) this.triggerLevelUp();
+      return;
+    }
+
     // Final Boss Defeat: Victory Transition
     if (monster.isBoss) {
       this.triggerVictory();
@@ -2121,6 +2207,11 @@ class RogueliteGame {
     for (const m of [...this.monsters]) {
       if (this.gameState !== 'PLAYING') break;
       this.processMonsterStatusEffects(m);
+      // U-03: a freshly-awakened mimic already acted during its ambush
+      if (m.skipNextTurn) {
+        m.skipNextTurn = false;
+        continue;
+      }
       if (m.hp > 0) {
         this.monsterTurn(m);
       }
@@ -2129,16 +2220,10 @@ class RogueliteGame {
     this.updateHUD();
     this.render();
 
-    // Check Player Death with Phoenix Feather check
+    // Check Player Death with Phoenix Feather / Phoenix Oath synergy
     if (this.player.hp <= 0 && this.gameState === 'PLAYING') {
-      if (this.hasRelic('phoenix_feather') && !this.phoenixUsed) {
-        this.phoenixUsed = true;
-        const reviveHp = Math.floor(this.getTotalMaxHp() * 0.5);
-        this.player.hp = reviveHp;
-        this.audio.playLevelUp();
-        this.triggerScreenShake();
-        this.createParticles(this.player.x, this.player.y, '#f1c40f', 30);
-        this.log('🪶 [불사조의 깃털]이 불타오르며 생명을 되살렸습니다! (50% HP 부활)', 'log-heal');
+      const revive = this.tryRelicRevive();
+      if (revive.ok) {
         this.updateHUD();
         return;
       }
@@ -2195,6 +2280,18 @@ class RogueliteGame {
       this.addFloatingText(m.x, m.y, `🧪 -${poisonDmg}`, '#55efc4');
       this.createParticles(m.x, m.y, '#55efc4', 4);
       se.poison -= 1;
+      if (m.hp <= 0) {
+        this.handleMonsterDeath(m);
+        return;
+      }
+    }
+
+    if (se.bleed > 0) {
+      const bleedDmg = se.bleedDamage || 4;
+      m.hp -= bleedDmg;
+      this.addFloatingText(m.x, m.y, `🩸 -${bleedDmg}`, '#c0392b');
+      this.createParticles(m.x, m.y, '#c0392b', 4);
+      se.bleed -= 1;
       if (m.hp <= 0) {
         this.handleMonsterDeath(m);
         return;
@@ -2441,6 +2538,25 @@ class RogueliteGame {
       if (skillIndex === 1) { // 강타 (Power Strike)
         const target = this.monsters.find((m) => Math.abs(m.x - this.player.x) <= 1 && Math.abs(m.y - this.player.y) <= 1);
         if (!target) {
+          // U-03: no enemy in reach — try to shatter an adjacent cracked wall instead
+          const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+          let wall = null;
+          for (const [ox, oy] of dirs) {
+            const w = this.dungeon.getCrackedWallAt(this.player.x + ox, this.player.y + oy);
+            if (w) { wall = w; break; }
+          }
+          if (wall) {
+            this.player.mp -= sk.cost;
+            const res = this.damageCrackedWall(wall.x, wall.y, { source: 'power_strike', damage: 99, canBreach: true });
+            if (res.ok) {
+              this.audio.playSkill();
+              this.triggerScreenShake();
+              this.createParticles(wall.x, wall.y, '#f1c40f', 18);
+              this.log('💥 [강타] 굳게 닫힌 균열 벽을 주먹으로 부숴 숨겨진 방을 드러냈습니다!', 'log-attack');
+            }
+            this.endTurn();
+            return;
+          }
           this.log('강타를 가할 인접한 적이 없습니다.', 'log-system');
           return;
         }
@@ -2700,6 +2816,30 @@ class RogueliteGame {
 
       this.player.inventory.splice(itemIndex, 1);
       this.endTurn();
+    } else if (item.type === 'bomb') {
+      // U-03: consume only if an adjacent cracked wall can actually be breached
+      const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+      let wall = null;
+      for (const [ox, oy] of dirs) {
+        const w = this.dungeon.getCrackedWallAt(this.player.x + ox, this.player.y + oy);
+        if (w) { wall = w; break; }
+      }
+      if (!wall) {
+        this.log('인접한 곳에 폭탄으로 부술 균열 벽이 없습니다.', 'log-system');
+        this.renderInventoryModal();
+        return;
+      }
+      const res = this.damageCrackedWall(wall.x, wall.y, { source: 'bomb', damage: item.effect.wallDamage || 99, canBreach: true });
+      if (res.ok) {
+        this.audio.playTrap();
+        this.triggerScreenShake();
+        this.createParticles(wall.x, wall.y, '#e67e22', 20);
+        this.log('💣 폭탄이 굉음과 함께 균열 벽을 무너뜨렸습니다! 숨겨진 방이 드러납니다.', 'log-attack');
+        if (item.qty > 1) item.qty -= 1;
+        else this.player.inventory.splice(itemIndex, 1);
+        this.closeModal('modalInventory');
+        this.endTurn();
+      }
     } else if (item.type === 'weapon' || item.type === 'armor' || item.type === 'ring') {
       const oldEquip = this.player.equipment[item.type];
       this.player.equipment[item.type] = item;
@@ -2727,6 +2867,7 @@ class RogueliteGame {
     this.relics.push(relic);
     this.audio.playLevelUp();
     this.log(`💎 전설의 유물 [${relic.name}]을(를) 획득했습니다! (${relic.desc})`, 'log-kill');
+    this.recomputeRelicSynergies();
     this.updateRelicsUI();
   }
 
@@ -2738,14 +2879,25 @@ class RogueliteGame {
     const container = document.getElementById('relicsList');
     if (!container) return;
 
-    if (this.relics.length === 0) {
-      container.innerHTML = '<span class="relic-empty">획득한 유물이 없습니다.</span>';
-      return;
-    }
+    const ownedIds = new Set(this.relics.map((r) => r.id));
+    const relicHtml = this.relics.length === 0
+      ? '<span class="relic-empty">획득한 유물이 없습니다.</span>'
+      : this.relics
+          .map((r) => `<span class="relic-badge" title="${r.desc}">${r.icon} ${r.name}</span>`)
+          .join('');
 
-    container.innerHTML = this.relics
-      .map((r) => `<span class="relic-badge" title="${r.desc}">${r.icon} ${r.name}</span>`)
+    // U-04: 2-set synergy badges (recomputed from owned relics, never persisted)
+    const synergyHtml = RELIC_SYNERGY_CATALOG
+      .filter((syn) => syn.requiredRelicIds.some((id) => ownedIds.has(id)))
+      .map((syn) => {
+        const have = syn.requiredRelicIds.filter((id) => ownedIds.has(id)).length;
+        const active = this.hasSynergy(syn.id);
+        const cls = active ? 'synergy-badge synergy-badge--active' : 'synergy-badge synergy-badge--partial';
+        return `<span class="${cls}" title="${syn.description}">✦ ${syn.name} (${have}/${syn.threshold})</span>`;
+      })
       .join('');
+
+    container.innerHTML = relicHtml + synergyHtml;
   }
 
   // Unified Derived Stats
@@ -2916,6 +3068,7 @@ class RogueliteGame {
     if (this.gameState === 'GAME_OVER' || this.gameState === 'VICTORY') return;
     this.gameState = 'GAME_OVER';
 
+    this.audio.setScene('GAME_OVER');
     this.audio.playDeath();
     document.getElementById('endFloor').textContent = `B${this.floorNumber}F`;
     document.getElementById('endTurns').textContent = this.turns;
@@ -2928,6 +3081,7 @@ class RogueliteGame {
     if (this.gameState === 'VICTORY' || this.gameState === 'GAME_OVER') return;
     this.gameState = 'VICTORY';
 
+    this.audio.setScene('VICTORY');
     this.audio.playLevelUp();
     document.getElementById('vicGold').textContent = this.player.gold;
     document.getElementById('vicSouls').textContent = this.player.runSouls;
@@ -3153,6 +3307,68 @@ class RogueliteGame {
       }
     });
 
+    // 3.5 U-03: Cracked Walls (only once discovered)
+    this.dungeon.crackedWalls.forEach((w) => {
+      if (w.destroyed || !w.revealed) return;
+      if (!this.dungeon.explored[w.y]?.[w.x]) return;
+      const px = w.x * TILE_SIZE;
+      const py = w.y * TILE_SIZE;
+      const isVisible = this.dungeon.visible[w.y]?.[w.x];
+      ctx.fillStyle = isVisible ? '#3a2f26' : '#211c17';
+      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      ctx.strokeStyle = '#6b4f3a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px + 4, py + 2);
+      ctx.lineTo(px + TILE_SIZE - 6, py + TILE_SIZE - 3);
+      ctx.moveTo(px + TILE_SIZE - 5, py + 4);
+      ctx.lineTo(px + 6, py + TILE_SIZE - 5);
+      ctx.stroke();
+      ctx.font = '13px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🪨', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+    });
+
+    // 3.6 U-03: Treasure Chests
+    this.dungeon.chests.forEach((c) => {
+      if (c.opened) return;
+      if (!this.dungeon.visible[c.y]?.[c.x]) return;
+      const px = c.x * TILE_SIZE;
+      const py = c.y * TILE_SIZE;
+      ctx.font = '17px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(c.source === 'secret' ? '🎁' : '📦', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+    });
+
+    // 3.7 U-02: Wandering Merchant
+    const merch = this.dungeon.merchant;
+    if (merch && merch.state === 'friendly' && this.dungeon.visible[merch.y]?.[merch.x]) {
+      const px = merch.x * TILE_SIZE;
+      const py = merch.y * TILE_SIZE;
+      ctx.fillStyle = 'rgba(243, 156, 18, 0.28)';
+      ctx.beginPath();
+      ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, TILE_SIZE * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+      const merchForge = typeof window !== 'undefined' && window.SpriteForge;
+      const merchSprite = merchForge ? merchForge.get('merchant', 32) : null;
+      if (merchSprite) {
+        ctx.drawImage(
+          merchSprite,
+          Math.round(px + TILE_SIZE / 2 - 16),
+          Math.round(py + TILE_SIZE / 2 - 16),
+          32,
+          32
+        );
+      } else {
+        ctx.font = '18px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🧙', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+      }
+    }
+
     // 4. Items on Floor
     this.itemsOnFloor.forEach((item) => {
       if (this.dungeon.visible[item.y] && this.dungeon.visible[item.y][item.x]) {
@@ -3180,11 +3396,20 @@ class RogueliteGame {
           ctx.fill();
         }
 
-        ctx.fillStyle = m.color;
-        ctx.font = m.isBoss ? 'bold 24px Cinzel, serif' : 'bold 18px Press Start 2P, monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(m.char, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+        const forge = typeof window !== 'undefined' && window.SpriteForge;
+        const sprite = forge ? forge.get(m.type, m.isBoss ? 48 : 32) : null;
+        if (sprite) {
+          const drawSize = m.isBoss ? 64 : (m.isMiniBoss || m.type === 'golem' || m.type === 'mimic' ? 44 : 32);
+          const cx = Math.round(px + TILE_SIZE / 2 - drawSize / 2);
+          const cy = Math.round(py + TILE_SIZE / 2 - drawSize / 2);
+          ctx.drawImage(sprite, cx, cy, drawSize, drawSize);
+        } else {
+          ctx.fillStyle = m.color;
+          ctx.font = m.isBoss ? 'bold 24px Cinzel, serif' : 'bold 18px Press Start 2P, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(m.char, px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+        }
 
         // Status Effects indicator above monster
         let statusEmoji = '';
@@ -3234,11 +3459,23 @@ class RogueliteGame {
       ctx.stroke();
     }
 
-    ctx.fillStyle = '#f1c40f';
-    ctx.font = 'bold 20px Press Start 2P, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('@', ppx + TILE_SIZE / 2, ppy + TILE_SIZE / 2);
+    const playerForge = typeof window !== 'undefined' && window.SpriteForge;
+    const playerSprite = playerForge ? playerForge.get(this.player.classId, 32) : null;
+    if (playerSprite) {
+      ctx.drawImage(
+        playerSprite,
+        Math.round(ppx + TILE_SIZE / 2 - 16),
+        Math.round(ppy + TILE_SIZE / 2 - 16),
+        32,
+        32
+      );
+    } else {
+      ctx.fillStyle = '#f1c40f';
+      ctx.font = 'bold 20px Press Start 2P, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('@', ppx + TILE_SIZE / 2, ppy + TILE_SIZE / 2);
+    }
 
     // 7. Particles
     this.particles.forEach((p) => {
@@ -3296,6 +3533,21 @@ class RogueliteGame {
       if (this.dungeon.visible[i.y] && this.dungeon.visible[i.y][i.x]) {
         mctx.fillStyle = '#3498db';
         mctx.fillRect(i.x * scaleX, i.y * scaleY, 3, 3);
+      }
+    });
+
+    // U-02: Merchant (gold dot once discovered)
+    const mm = this.dungeon.merchant;
+    if (mm && mm.state !== 'defeated' && this.dungeon.explored[mm.y]?.[mm.x]) {
+      mctx.fillStyle = '#f1c40f';
+      mctx.fillRect(mm.x * scaleX - 1, mm.y * scaleY - 1, 5, 5);
+    }
+
+    // U-03: Treasure chests + revealed secret rooms
+    this.dungeon.chests.forEach((c) => {
+      if (!c.opened && this.dungeon.explored[c.y]?.[c.x]) {
+        mctx.fillStyle = '#e67e22';
+        mctx.fillRect(c.x * scaleX, c.y * scaleY, 3, 3);
       }
     });
 
@@ -3465,6 +3717,12 @@ class RogueliteGame {
   closeModal(modalId) {
     const m = document.getElementById(modalId);
     if (m) m.classList.remove('active');
+    // U-02: leaving the black market via ✕/backdrop must also restore the turn loop
+    if (modalId === 'modalDungeonShop' && this.gameState === 'SHOP') {
+      const merchant = this.currentMerchant;
+      this.currentMerchant = null;
+      if (!merchant || merchant.state === 'friendly') this.gameState = 'PLAYING';
+    }
   }
 
   renderInventoryModal() {
@@ -3583,6 +3841,343 @@ class RogueliteGame {
     });
   }
 
+  // =============================================================================
+  // U-02  Wandering Merchant "Greed" & Black Market
+  // =============================================================================
+  interactWithMerchant(merchant) {
+    if (!merchant || merchant.state !== 'friendly') return;
+    this.currentMerchant = merchant;
+    this.gameState = 'SHOP';
+    this.audio.playShrine();
+    this.log('🧙 방랑 상인 그리드가 은밀히 좌판을 펼칩니다.', 'log-item');
+    this.renderShopModal(merchant);
+    this.openModal('modalDungeonShop');
+  }
+
+  shopOfferView(offer) {
+    const cat = offer.kind === 'relic'
+      ? RELIC_CATALOG.find((r) => r.id === offer.catalogId)
+      : ITEM_CATALOG.find((i) => i.id === offer.catalogId);
+    return cat || { name: '알 수 없는 물건', icon: '❓', desc: '' };
+  }
+
+  renderShopModal(merchant) {
+    const goldEl = document.getElementById('shopGoldCount');
+    if (goldEl) goldEl.textContent = this.player.gold;
+
+    const list = document.getElementById('shopOfferList');
+    if (!list) return;
+    list.innerHTML = merchant.stock.map((offer) => {
+      const cat = this.shopOfferView(offer);
+      const check = this.canBuyShopOffer(offer.offerId);
+      const disabled = offer.sold || !check.ok;
+      const label = offer.sold ? '판매 완료'
+        : check.ok ? '구매'
+        : check.code === 'NO_GOLD' ? '골드 부족'
+        : check.code === 'INVENTORY_FULL' ? '가방 가득'
+        : check.code === 'ALREADY_OWNED' ? '이미 보유' : '구매 불가';
+      return `
+        <div class="shop-offer-card${offer.sold ? ' sold' : ''}">
+          <div class="shop-offer-header">
+            <div class="shop-offer-icon">${cat.icon}</div>
+            <div>
+              <div class="shop-offer-title">${cat.name}</div>
+              <div class="shop-offer-type">${offer.kind === 'relic' ? '유물' : cat.type || '소모품'}</div>
+            </div>
+          </div>
+          <div class="shop-offer-desc">${cat.desc || ''}</div>
+          <div class="shop-offer-footer">
+            <span class="shop-offer-price">💰 ${offer.price}</span>
+            <button class="btn btn--gold shop-buy-btn" data-offer-id="${offer.offerId}" ${disabled ? 'disabled' : ''}>${label}</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    const stealBtn = document.getElementById('btnShopSteal');
+    if (stealBtn) stealBtn.disabled = merchant.theftAttempted || merchant.state !== 'friendly';
+  }
+
+  canBuyShopOffer(offerId) {
+    const merchant = this.currentMerchant;
+    if (!merchant) return { ok: false, code: 'NOT_FOUND', reason: '상인이 없습니다.' };
+    const offer = merchant.stock.find((o) => o.offerId === offerId);
+    if (!offer) return { ok: false, code: 'NOT_FOUND', reason: '해당 물품이 없습니다.' };
+    if (offer.sold) return { ok: false, code: 'SOLD', reason: '이미 판매된 물품입니다.' };
+    if (this.player.gold < offer.price) return { ok: false, code: 'NO_GOLD', reason: '골드가 부족합니다.' };
+    if (offer.kind === 'relic') {
+      if (this.hasRelic(offer.catalogId)) return { ok: false, code: 'ALREADY_OWNED', reason: '이미 보유한 유물입니다.' };
+    } else {
+      const cat = ITEM_CATALOG.find((i) => i.id === offer.catalogId);
+      const stackable = cat && cat.type === 'potion' && this.player.inventory.some((i) => i.id === cat.id);
+      if (!stackable && this.player.inventory.length >= 16) {
+        return { ok: false, code: 'INVENTORY_FULL', reason: '가방이 가득 찼습니다.' };
+      }
+    }
+    return { ok: true, code: 'CAN_BUY' };
+  }
+
+  buyShopOffer(offerId) {
+    const check = this.canBuyShopOffer(offerId);
+    if (!check.ok) {
+      this.log(`구매 실패: ${check.reason}`, 'log-system');
+      return check;
+    }
+    const merchant = this.currentMerchant;
+    const offer = merchant.stock.find((o) => o.offerId === offerId);
+
+    // Commit once: grant -> deduct gold -> mark sold
+    if (offer.kind === 'relic') {
+      const relic = RELIC_CATALOG.find((r) => r.id === offer.catalogId);
+      this.player.gold -= offer.price;
+      offer.sold = true;
+      this.addRelic({ ...relic });
+    } else {
+      const cat = ITEM_CATALOG.find((i) => i.id === offer.catalogId);
+      const added = this.addItemToInventory({ ...cat });
+      if (!added) return { ok: false, code: 'INVENTORY_FULL', reason: '가방이 가득 찼습니다.' };
+      this.player.gold -= offer.price;
+      offer.sold = true;
+      this.log(`🛒 [${cat.name}]을(를) ${offer.price} G에 구매했습니다.`, 'log-item');
+    }
+    this.audio.playItemPickup();
+    this.renderShopModal(merchant);
+    this.updateHUD();
+    return { ok: true, code: 'PURCHASED', offer };
+  }
+
+  attemptShopTheft() {
+    const merchant = this.currentMerchant;
+    if (!merchant) return { ok: false, code: 'NO_MERCHANT', reason: '상인이 없습니다.' };
+    if (merchant.theftAttempted || merchant.state !== 'friendly') {
+      return { ok: false, code: 'THEFT_ALREADY_ATTEMPTED', reason: '이미 상인의 분노를 샀습니다.' };
+    }
+    merchant.theftAttempted = true;
+    merchant.state = 'hostile';
+    this.closeModal('modalDungeonShop');
+    this.currentMerchant = null;
+    this.gameState = 'PLAYING';
+    this.awakenMerchantBoss(merchant);
+    this.audio.playBossRoar();
+    this.triggerScreenShake();
+    this.log('🗡️ 좌판을 걷어차자 그리드의 두 눈이 핏빛으로 물듭니다 — "감히 내 물건에 손을 대?!"', 'log-damage');
+    this.endTurn();
+    return { ok: true, code: 'MERCHANT_HOSTILE' };
+  }
+
+  awakenMerchantBoss(merchant) {
+    this.spawnMonster('shop_guard', merchant.x, merchant.y);
+  }
+
+  closeShopModal() {
+    this.closeModal('modalDungeonShop');
+    const merchant = this.currentMerchant;
+    this.currentMerchant = null;
+    if (!merchant || merchant.state === 'friendly') {
+      this.gameState = 'PLAYING';
+    }
+  }
+
+  // =============================================================================
+  // U-03  Secret Rooms, Cracked Walls, Treasure Chests & Mimics
+  // =============================================================================
+  damageCrackedWall(x, y, hit) {
+    const wall = this.dungeon.getCrackedWallAt(x, y);
+    if (!wall) return { ok: false, code: 'NOT_CRACKED', reason: '균열 벽이 아닙니다.' };
+    if (!hit || !hit.canBreach) return { ok: false, code: 'CANNOT_BREACH', reason: '이 수단으로는 벽을 부술 수 없습니다.' };
+
+    wall.hp -= (hit.damage || 0);
+    if (wall.hp > 0) {
+      wall.revealed = true;
+      return { ok: true, code: 'WALL_DAMAGED' };
+    }
+    wall.destroyed = true;
+    this.dungeon.tiles[y][x] = 1;
+    const sr = this.dungeon.secretRooms.find((s) => s.id === wall.secretRoomId);
+    if (sr) sr.revealed = true;
+    this.dungeon.calculateFOV(this.player.x, this.player.y, this.player.fov);
+    return { ok: true, code: 'WALL_BROKEN' };
+  }
+
+  useBlastBombAt(x, y) {
+    const idx = this.player.inventory.findIndex((i) => i.type === 'bomb');
+    if (idx < 0) return { ok: false, code: 'NO_BOMB', reason: '폭탄이 없습니다.' };
+    const res = this.damageCrackedWall(x, y, { source: 'bomb', damage: 99, canBreach: true });
+    if (res.ok) {
+      const item = this.player.inventory[idx];
+      if (item.qty > 1) item.qty -= 1;
+      else this.player.inventory.splice(idx, 1);
+    }
+    return res;
+  }
+
+  openChest(chest, rng = Math.random) {
+    if (!chest || chest.opened) return { ok: false, code: 'CHEST_ALREADY_OPEN', reason: '이미 열린 상자입니다.' };
+
+    if (chest.mimicRoll === null || chest.mimicRoll === undefined) {
+      chest.mimicRoll = rng();
+    }
+    const isMimic = chest.mimicRoll < FEATURE_RULES.mimicChance;
+
+    if (isMimic) {
+      chest.opened = true;
+      chest.resolved = true;
+      this.awakenMimic(chest);
+      return { ok: true, code: 'MIMIC_AWAKENED' };
+    }
+
+    const reward = this.rollChestReward(chest, rng);
+    const granted = this.grantChestReward(chest, reward);
+    chest.opened = true;
+    chest.resolved = true;
+    if (chest.source === 'secret') {
+      const room = this.dungeon.secretRooms[0];
+      if (room) room.lootClaimed = true;
+    }
+    this.audio.playItemPickup();
+    this.createParticles(chest.x, chest.y, '#f1c40f', 14);
+    this.log(`🗝️ 보물상자를 열었습니다! ${granted.summary}`, 'log-item');
+    this.updateHUD();
+    return { ok: true, code: 'CHEST_LOOTED' };
+  }
+
+  awakenMimic(chest) {
+    this.audio.playBossRoar();
+    this.triggerScreenShake();
+    this.createParticles(chest.x, chest.y, '#e67e22', 20);
+    this.log('📦 상자가 이빨을 드러내며 튀어올랐습니다 — 미믹의 기습!', 'log-damage');
+    this.spawnMonster('mimic', chest.x, chest.y);
+    const mimic = this.monsters.find((m) => m.x === chest.x && m.y === chest.y && m.type === 'mimic');
+    if (mimic) {
+      // Scale slightly with depth so it stays threatening
+      mimic.atk += Math.floor(this.floorNumber * 2);
+      mimic.hp += this.floorNumber * 10;
+      mimic.maxHp = mimic.hp;
+      if (Math.abs(mimic.x - this.player.x) <= 1 && Math.abs(mimic.y - this.player.y) <= 1) {
+        this.monsterTurn(mimic);
+        mimic.skipNextTurn = true;
+      }
+    }
+  }
+
+  rollChestReward(chest, rng = Math.random) {
+    const premium = chest.source === 'secret';
+    const roll = rng();
+    const goldBase = premium ? 120 : 45;
+    const gold = goldBase + Math.floor(rng() * goldBase);
+
+    if (premium) {
+      if (roll < 0.4) {
+        const relic = RELIC_CATALOG.filter((r) => !this.hasRelic(r.id));
+        if (relic.length > 0) return { gold: Math.floor(gold * 0.5), relic: relic[Math.floor(rng() * relic.length)] };
+      }
+      const pool = ITEM_CATALOG.filter((i) => i.rarity === 'epic' || i.rarity === 'legendary' || i.rarity === 'rare');
+      return { gold, item: pool[Math.floor(rng() * pool.length)] };
+    }
+
+    if (roll < 0.55) {
+      const pool = ITEM_CATALOG.filter((i) => i.rarity === 'common' || i.rarity === 'rare');
+      return { gold: Math.floor(gold * 0.6), item: pool[Math.floor(rng() * pool.length)] };
+    }
+    return { gold };
+  }
+
+  grantChestReward(chest, reward) {
+    const parts = [];
+    if (reward.relic) {
+      this.addRelic({ ...reward.relic });
+      parts.push(`유물 [${reward.relic.name}]`);
+    }
+    if (reward.item) {
+      const added = this.addItemToInventory({ ...reward.item });
+      if (added) parts.push(`[${reward.item.name}]`);
+    }
+    if (reward.gold) {
+      this.player.gold += reward.gold;
+      parts.push(`${reward.gold} G`);
+    }
+    return { summary: parts.length ? `(${parts.join(', ')} 획득)` : '(텅 비어 있습니다)' };
+  }
+
+  // =============================================================================
+  // U-04  Relic 2-Set Synergies
+  // =============================================================================
+  recomputeRelicSynergies({ announce = true } = {}) {
+    const prev = this.activeSynergyIds || new Set();
+    const next = computeActiveSynergies(this.relics.map((r) => r.id));
+    if (announce) {
+      for (const id of next) {
+        if (!prev.has(id)) {
+          const syn = RELIC_SYNERGY_CATALOG.find((s) => s.id === id);
+          this.audio.playLevelUp();
+          this.triggerScreenShake();
+          this.log(`✦ 세트 효과 발동 — [${syn.name}]: ${syn.description}`, 'log-kill');
+        }
+      }
+    }
+    this.activeSynergyIds = next;
+    this.updateRelicsUI();
+  }
+
+  hasSynergy(synergyId) {
+    return this.activeSynergyIds ? this.activeSynergyIds.has(synergyId) : false;
+  }
+
+  resolveOnHitRelicEffects({ target, damage, isCrit }, rng = Math.random) {
+    const procs = [];
+    let extraDamage = 0;
+    if (this.hasSynergy('dark_empire_legacy')) {
+      if (rng() < 0.2) {
+        extraDamage += 15;
+        procs.push('dark_empire_legacy');
+      }
+    }
+    return { extraDamage, procs };
+  }
+
+  resolveVampireHeal({ target, damage, isCrit, bleedingBeforeHit }) {
+    const maxHp = this.getTotalMaxHp();
+    const lostHp = maxHp - this.player.hp;
+    let heal = Math.max(1, Math.floor(damage * 0.25));
+    if (this.hasSynergy('vampire_feast') && bleedingBeforeHit) {
+      heal *= 2;
+    }
+    heal = Math.min(heal, Math.max(0, lostHp));
+    if (heal > 0) {
+      this.player.hp += heal;
+      this.addFloatingText(this.player.x, this.player.y, `+${heal} HP`, '#2ecc71');
+    }
+    return heal;
+  }
+
+  tryRelicRevive() {
+    if (!this.hasRelic('phoenix_feather') || this.phoenixUsed) {
+      return { ok: false, code: 'CANNOT_REVIVE', reason: '부활 수단이 없습니다.' };
+    }
+    this.phoenixUsed = true;
+    const maxHp = this.getTotalMaxHp();
+    const oath = this.hasSynergy('phoenix_oath');
+    this.player.hp = oath ? maxHp : Math.floor(maxHp * 0.5);
+    this.player.statusEffects.burn = 0;
+    this.player.statusEffects.poison = 0;
+    this.audio.playLevelUp();
+    this.triggerScreenShake();
+    this.createParticles(this.player.x, this.player.y, '#f1c40f', 30);
+    this.log(`🪶 [불사조의 깃털]이 불타오르며 생명을 되살렸습니다! (${oath ? '100' : '50'}% HP 부활)`, 'log-heal');
+
+    if (oath) {
+      this.log('🔥 [불사조의 맹세] 부활의 화염 폭발이 주변을 휩씁니다! (반경 3칸 50 화염 피해)', 'log-attack');
+      for (const m of [...this.monsters]) {
+        if (this.gameState !== 'PLAYING') break;
+        if (Math.abs(m.x - this.player.x) <= 3 && Math.abs(m.y - this.player.y) <= 3) {
+          m.hp -= 50;
+          this.addFloatingText(m.x, m.y, '🔥 -50', '#ff7675');
+          if (m.hp <= 0) this.handleMonsterDeath(m);
+        }
+      }
+    }
+    return { ok: true, code: 'REVIVED' };
+  }
+
   // Codex & Bestiary Render
   renderCodexModal(activeTab = 'monsters') {
     const container = document.getElementById('codexContent');
@@ -3597,8 +4192,14 @@ class RogueliteGame {
         const killCount = this.metaData.bestiary[key] || 0;
         const entry = document.createElement('div');
         entry.className = 'codex-entry';
+        const spriteUrl = (typeof window !== 'undefined' && window.SpriteForge)
+          ? window.SpriteForge.dataURL(key, 48)
+          : null;
+        const iconHtml = spriteUrl
+          ? `<div class="codex-entry__icon"><img src="${spriteUrl}" alt="${m.name}" width="44" height="44" style="image-rendering: pixelated;"></div>`
+          : `<div class="codex-entry__icon" style="color: ${m.color}; font-family: 'Press Start 2P', monospace;">${m.char}</div>`;
         entry.innerHTML = `
-          <div class="codex-entry__icon" style="color: ${m.color}; font-family: 'Press Start 2P', monospace;">${m.char}</div>
+          ${iconHtml}
           <div class="codex-entry__info">
             <div class="codex-entry__title">
               <span>${m.name}</span>
@@ -3708,7 +4309,9 @@ class RogueliteGame {
       } else if (e.key === 'e' || e.key === 'E' || e.key === '>') {
         this.descendStairs();
       } else if (e.key === 'Escape') {
-        if (this.gameState === 'PLAYING') {
+        if (this.gameState === 'SHOP') {
+          this.closeShopModal();
+        } else if (this.gameState === 'PLAYING') {
           document.querySelectorAll('.modal.active').forEach((m) => {
             if (m.id !== 'modalGameOver' && m.id !== 'modalVictory' && m.id !== 'modalLevelUp') {
               m.classList.remove('active');
@@ -3752,9 +4355,35 @@ class RogueliteGame {
     });
 
     document.getElementById('btnSoundToggle').addEventListener('click', () => {
-      this.audio.enabled = !this.audio.enabled;
-      document.getElementById('btnSoundToggle').textContent = this.audio.enabled ? '🔊' : '🔇';
+      this.audio.init();
+      const nowEnabled = this.audio.setEnabled(!this.audio.enabled);
+      document.getElementById('btnSoundToggle').textContent = nowEnabled ? '🔊' : '🔇';
     });
+    const soundBtnInit = document.getElementById('btnSoundToggle');
+    if (soundBtnInit) soundBtnInit.textContent = this.audio.enabled ? '🔊' : '🔇';
+
+    // U-02: Black Market shop — buy (event delegation), steal, leave
+    const shopList = document.getElementById('shopOfferList');
+    if (shopList) {
+      shopList.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-offer-id]');
+        if (!btn || btn.disabled) return;
+        this.buyShopOffer(btn.dataset.offerId);
+      });
+    }
+    const stealBtn = document.getElementById('btnShopSteal');
+    if (stealBtn) {
+      stealBtn.addEventListener('click', () => {
+        if (!this.currentMerchant || this.currentMerchant.theftAttempted) return;
+        if (window.confirm('상인을 공격하면 되돌릴 수 없습니다. 그리드가 히든 보스로 각성합니다. 계속할까요?')) {
+          this.attemptShopTheft();
+        }
+      });
+    }
+    const leaveBtn = document.getElementById('btnShopLeave');
+    if (leaveBtn) {
+      leaveBtn.addEventListener('click', () => this.closeShopModal());
+    }
 
     document.getElementById('btnHelp').addEventListener('click', () => {
       this.openModal('modalHelp');

@@ -68,4 +68,22 @@ describe('웹 UI 페이지', () => {
     expect(script).toContain('review: withFallback(leader)');
     expect(script).toContain('implement: withFallback(worker)');
   });
+
+  it('모델 토론 탭에서 토론자, 턴 수, 서기를 지정하고 실행한다', () => {
+    const script = inlineScript(html);
+
+    expect(html).toContain('data-tab="discussion"');
+    expect(html).toContain('id="tab-discussion"');
+    expect(html).toContain('id="discussionParticipants"');
+    expect(html).toContain('id="discussionTurns"');
+    expect(html).toContain('id="discussionScribe"');
+    expect(html).toContain('id="discussionUsageInput"');
+    expect(html).toContain('id="discussionUsageCost"');
+    expect(html).toContain('id="discussionUsageProviders"');
+    expect(script).toContain("api('/api/discussion/run'");
+    expect(script).toContain("event.type === 'usage'");
+    expect(script).toContain('addDiscussionUsageEvent(event)');
+    expect(script).toContain("event.type === 'discussion.turn.end'");
+    expect(script).toContain("event.type === 'discussion.summary.end'");
+  });
 });

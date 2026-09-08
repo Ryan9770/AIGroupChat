@@ -420,6 +420,19 @@ pre.diff {
 }
 .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
 
+/* ── 구조화 토론 ──────────────────────────────────────────── */
+.discussion-entry {
+  border-left: 4px solid var(--accent);
+  background: var(--bg);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.discussion-entry.pending { opacity: .7; }
+.discussion-entry.failed { border-left-color: var(--bad); background: var(--bad-light); }
+.discussion-entry .discussion-text { white-space: pre-wrap; margin-top: 8px; line-height: 1.65; }
+.discussion-summary { white-space: pre-wrap; line-height: 1.7; }
+
 /* ── 모달 ─────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
@@ -468,6 +481,7 @@ pre.diff {
   <button data-tab="status" aria-selected="true">📊 대시보드 및 현황</button>
   <button data-tab="run" aria-selected="false">🚀 단일 위임 (Run)</button>
   <button data-tab="plan" aria-selected="false">🗺️ 멀티 에이전트 계획 (Plan)</button>
+  <button data-tab="discussion" aria-selected="false">💬 모델 토론 (Discussion)</button>
   <button data-tab="ws" aria-selected="false">🌿 작업 공간 (Workspaces)</button>
 </nav>
 
@@ -667,7 +681,90 @@ pre.diff {
     </div>
   </section>
 
-  <!-- ── 4. 작업 공간 ─────────────────────────────────────── -->
+  <!-- ── 4. 구조화 모델 토론 ──────────────────────────────── -->
+  <section id="tab-discussion" hidden>
+    <div class="card">
+      <h2>
+        <span>모델 패널 토론 설정</span>
+        <span class="hint" style="margin:0">파일 수정을 요청하지 않는 plan 모드로 실행됩니다</span>
+      </h2>
+      <div>
+        <label>토론 주제 또는 프로젝트 질문</label>
+        <textarea id="discussionTopic" placeholder="예: 현재 team 프로젝트의 기능과 역할, 장점과 단점, SMART 및 SWOT 분석을 통한 개선점을 도출하세요."></textarea>
+      </div>
+      <div style="margin-top:14px">
+        <label>서기 정리 요구사항</label>
+        <textarea id="discussionSummaryInstructions" style="min-height:70px">핵심 합의와 이견, 기능과 역할, 장점과 단점, SMART 분석, SWOT 분석, 우선순위별 개선안과 다음 실행 단계를 정리하세요.</textarea>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="ghost" id="discussionExample">✨ 프로젝트 분석 예시 채우기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:12px">
+        <h2 style="margin:0;flex:1">토론자와 발언 순서</h2>
+        <button class="ghost" id="discussionAddParticipant">+ 토론자 추가</button>
+      </div>
+      <div id="discussionParticipants"></div>
+      <div class="hint">위에서 아래 순서로 돌아가며 발언합니다. 같은 provider도 모델이나 관점을 달리해 여러 번 추가할 수 있습니다.</div>
+    </div>
+
+    <div class="card">
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+        <div><label>전체 발언 턴</label><input id="discussionTurns" type="number" min="10" max="20" value="12"></div>
+        <div><label>서기 provider</label><select id="discussionScribe"></select></div>
+        <div><label>서기 모델 지정 (선택)</label><input id="discussionScribeModel" placeholder="예: gpt-5.4-mini"></div>
+      </div>
+      <div class="row" style="margin-top:16px">
+        <button class="act" id="discussionGo">▶ 토론 시작</button>
+        <button class="ghost danger" id="discussionStop" disabled>■ 토론 중단</button>
+        <span class="muted" id="discussionProgress"></span>
+        <span class="muted mono" id="discussionTimer" style="margin-left:auto"></span>
+      </div>
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:16px 0 0">
+        <div class="stat-box">
+          <div class="stat-label">누적 입력 토큰</div>
+          <div class="stat-value mono" id="discussionUsageInput">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">누적 출력 토큰</div>
+          <div class="stat-value mono" id="discussionUsageOutput">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">캐시 읽기 / 생성</div>
+          <div class="stat-value mono" id="discussionUsageCache">0 / 0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">추론 토큰</div>
+          <div class="stat-value mono" id="discussionUsageThinking">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">확인된 누적 비용</div>
+          <div class="stat-value mono" id="discussionUsageCost">—</div>
+          <div class="stat-desc" id="discussionUsageCostNote">사용량 수신 대기</div>
+        </div>
+      </div>
+      <div class="hint mono" id="discussionUsageProviders">Provider별 사용량이 여기에 표시됩니다.</div>
+      <div class="hint" id="discussionWarn"></div>
+      <div class="hint">모델 호출은 전체 턴 수 + 서기 1회입니다. 각 발언에는 누적 요약과 최근 3개 발언만 전달됩니다. 캐시 토큰의 입력 포함 여부와 비용 제공 여부는 provider마다 다릅니다.</div>
+    </div>
+
+    <div class="card">
+      <div class="console-header">
+        <h2 style="margin:0">토론 기록</h2>
+        <button class="ghost" id="discussionClear" style="padding:4px 10px;font-size:12px">🧹 지우기</button>
+      </div>
+      <div id="discussionTranscript"><div class="empty">토론을 시작하면 발언 내용이 여기에 표시됩니다.</div></div>
+    </div>
+
+    <div class="card" id="discussionResult" hidden>
+      <h2>서기 최종 보고서</h2>
+      <div id="discussionResultBody" class="discussion-summary"></div>
+    </div>
+  </section>
+
+  <!-- ── 5. 작업 공간 ─────────────────────────────────────── -->
   <section id="tab-ws" hidden>
     <div class="card">
       <div class="row">
@@ -752,7 +849,7 @@ initTheme();
 document.querySelectorAll('nav button').forEach((btn) => {
   btn.onclick = () => {
     document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
-    for (const name of ['status', 'run', 'plan', 'ws']) $('tab-' + name).hidden = name !== btn.dataset.tab;
+    for (const name of ['status', 'run', 'plan', 'discussion', 'ws']) $('tab-' + name).hidden = name !== btn.dataset.tab;
     if (btn.dataset.tab === 'ws') loadWorkspaces();
   };
 });
@@ -813,6 +910,7 @@ async function loadStatus() {
 
     renderRoutes();
     renderTeamPresetOptions();
+    renderDiscussionSettings();
     syncRunWarn();
     syncPlanWarn();
   } catch (err) {
@@ -1242,6 +1340,275 @@ $('planGo').onclick = async () => {
 $('planStop').onclick = () => {
   api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId: planRunId }) });
   if (stopPlanTimer) { stopPlanTimer(); stopPlanTimer = null; }
+};
+
+/* ── 구조화 모델 토론 (Discussion) ───────────────────────── */
+let discussionParticipants = [];
+let discussionRunId = null, stopDiscussionTimer = null;
+const newDiscussionUsage = () => ({
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheCreationTokens: 0,
+  cacheReadTokens: 0,
+  thinkingTokens: 0,
+  costUsd: 0,
+  usageEvents: 0,
+  expectedCalls: 0,
+  pricedUsageEvents: 0,
+  unpricedUsageEvents: 0,
+  byProvider: {},
+});
+let discussionUsage = newDiscussionUsage();
+
+function addDiscussionUsageEvent(event) {
+  const provider = event.provider || 'unknown';
+  const providerUsage = discussionUsage.byProvider[provider] || newDiscussionUsage();
+  for (const usage of [discussionUsage, providerUsage]) {
+    usage.inputTokens += Number(event.inputTokens || 0);
+    usage.outputTokens += Number(event.outputTokens || 0);
+    usage.cacheCreationTokens += Number(event.cacheCreationTokens || 0);
+    usage.cacheReadTokens += Number(event.cacheReadTokens || 0);
+    usage.thinkingTokens += Number(event.thinkingTokens || 0);
+    usage.usageEvents += 1;
+    if (event.costUsd == null) usage.unpricedUsageEvents += 1;
+    else {
+      usage.costUsd += Number(event.costUsd);
+      usage.pricedUsageEvents += 1;
+    }
+  }
+  discussionUsage.byProvider[provider] = providerUsage;
+  renderDiscussionUsage();
+}
+
+function resetDiscussionUsage() {
+  discussionUsage = newDiscussionUsage();
+  renderDiscussionUsage();
+}
+
+function renderDiscussionUsage() {
+  const number = (value) => Number(value || 0).toLocaleString('ko-KR');
+  $('discussionUsageInput').textContent = number(discussionUsage.inputTokens);
+  $('discussionUsageOutput').textContent = number(discussionUsage.outputTokens);
+  $('discussionUsageCache').textContent =
+    `${number(discussionUsage.cacheReadTokens)} / ${number(discussionUsage.cacheCreationTokens)}`;
+  $('discussionUsageThinking').textContent = number(discussionUsage.thinkingTokens);
+  $('discussionUsageCost').textContent = discussionUsage.pricedUsageEvents > 0
+    ? `$${discussionUsage.costUsd.toFixed(4)}`
+    : '—';
+  $('discussionUsageCostNote').textContent = discussionUsage.usageEvents === 0
+    ? `사용량 수신 대기${discussionUsage.expectedCalls ? ` · 예정 ${discussionUsage.expectedCalls}회` : ''}`
+    : discussionUsage.unpricedUsageEvents > 0
+      ? `사용량 ${discussionUsage.usageEvents}/${discussionUsage.expectedCalls || '?'}회 수신 · ${discussionUsage.unpricedUsageEvents}회 비용 미제공`
+      : `사용량 ${discussionUsage.usageEvents}/${discussionUsage.expectedCalls || '?'}회 수신 · 모든 비용 포함`;
+
+  const providers = Object.entries(discussionUsage.byProvider);
+  $('discussionUsageProviders').innerHTML = providers.length === 0
+    ? 'Provider별 사용량이 여기에 표시됩니다.'
+    : providers.map(([provider, usage]) => {
+        const cost = usage.pricedUsageEvents > 0 ? `$${usage.costUsd.toFixed(4)}` : '비용 미제공';
+        return `<div><b>${esc(provider)}</b> · in ${number(usage.inputTokens)} · out ${number(usage.outputTokens)}` +
+          ` · cache R/W ${number(usage.cacheReadTokens)}/${number(usage.cacheCreationTokens)}` +
+          ` · thinking ${number(usage.thinkingTokens)} · ${esc(cost)}</div>`;
+      }).join('');
+}
+
+const usableDiscussionProviders = () =>
+  providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
+
+function renderDiscussionSettings() {
+  const usable = usableDiscussionProviders();
+  discussionParticipants = discussionParticipants.filter((participant) => usable.includes(participant.provider));
+
+  if (discussionParticipants.length === 0) {
+    const defaultRoles = ['제품 전략과 사용자 가치', '기술 구조와 실행 가능성', '위험과 반론'];
+    discussionParticipants = usable.slice(0, Math.min(3, usable.length)).map((provider, index) => ({
+      provider,
+      role: defaultRoles[index] || '독립적인 검토 관점',
+      model: '',
+    }));
+  }
+
+  renderDiscussionParticipants();
+  const previousScribe = $('discussionScribe').value;
+  const preferredScribe = usable.includes(previousScribe)
+    ? previousScribe
+    : usable.includes('codex')
+      ? 'codex'
+      : usable.includes('claude')
+        ? 'claude'
+        : usable[0] || '';
+  $('discussionScribe').innerHTML = usable.map((provider) =>
+    `<option value="${esc(provider)}" ${provider === preferredScribe ? 'selected' : ''}>${esc(provider)}</option>`
+  ).join('');
+  $('discussionScribe').disabled = usable.length === 0;
+  syncDiscussionWarn();
+}
+
+function renderDiscussionParticipants() {
+  const usable = usableDiscussionProviders();
+  $('discussionParticipants').innerHTML = discussionParticipants.map((participant, index) => {
+    return `<div class="grid" style="grid-template-columns:minmax(150px,.8fr) minmax(220px,1.4fr) minmax(180px,1fr) auto;margin-bottom:10px;align-items:end">
+      <div><label>${index + 1}번째 발언자</label><select data-discussion-index="${index}" data-discussion-key="provider">
+        ${usable.map((provider) => `<option value="${esc(provider)}" ${provider === participant.provider ? 'selected' : ''}>${esc(provider)}</option>`).join('')}
+      </select></div>
+      <div><label>관점/역할</label><input data-discussion-index="${index}" data-discussion-key="role" value="${esc(participant.role)}" placeholder="예: 보안과 운영 위험"></div>
+      <div><label>모델 지정 (선택)</label><input data-discussion-index="${index}" data-discussion-key="model" value="${esc(participant.model || '')}" placeholder="provider 기본 모델"></div>
+      <button class="ghost danger" data-discussion-remove="${index}">삭제</button>
+    </div>`;
+  }).join('');
+
+  $('discussionParticipants').querySelectorAll('[data-discussion-key]').forEach((element) => {
+    element.onchange = () => {
+      const participant = discussionParticipants[+element.dataset.discussionIndex];
+      if (!participant) return;
+      participant[element.dataset.discussionKey] = element.value;
+      if (element.dataset.discussionKey === 'provider') renderDiscussionParticipants();
+      syncDiscussionWarn();
+    };
+  });
+  $('discussionParticipants').querySelectorAll('[data-discussion-remove]').forEach((button) => {
+    button.onclick = () => {
+      discussionParticipants.splice(+button.dataset.discussionRemove, 1);
+      renderDiscussionParticipants();
+      syncDiscussionWarn();
+    };
+  });
+  $('discussionAddParticipant').disabled = usable.length === 0 || discussionParticipants.length >= 8;
+}
+
+$('discussionAddParticipant').onclick = () => {
+  const usable = usableDiscussionProviders();
+  const provider = usable[discussionParticipants.length % usable.length];
+  if (!provider) return;
+  discussionParticipants.push({ provider, role: '독립적인 검토 관점', model: '' });
+  renderDiscussionParticipants();
+  syncDiscussionWarn();
+};
+
+function syncDiscussionWarn() {
+  const turns = Number($('discussionTurns').value);
+  const warnings = [];
+  if (discussionParticipants.length < 2) warnings.push('토론자는 두 명 이상 필요합니다.');
+  if (!Number.isInteger(turns) || turns < 10 || turns > 20) warnings.push('전체 발언 턴은 10~20 사이의 정수여야 합니다.');
+  if (discussionParticipants.some((participant) => !participant.role.trim())) warnings.push('모든 토론자의 관점/역할을 입력하세요.');
+  $('discussionWarn').innerHTML = warnings.length
+    ? `<span class="bad">⚠ ${warnings.map(esc).join(' ')}</span>`
+    : '토론자는 지정한 순서로 돌아가며 발언하고, 마지막에 서기가 전체 기록을 종합합니다.';
+  $('discussionGo').disabled = warnings.length > 0 || !$('discussionScribe').value;
+}
+$('discussionTurns').onchange = syncDiscussionWarn;
+$('discussionScribe').onchange = syncDiscussionWarn;
+
+$('discussionExample').onclick = () => {
+  $('discussionTopic').value = '현재 team 프로젝트의 기능과 역할, 장점과 단점을 분석하고 SMART 분석 및 SWOT 분석을 통해 개선점을 도출하세요.';
+  $('discussionSummaryInstructions').value =
+    '프로젝트 기능과 역할 요약, 장점과 단점, SMART 목표, SWOT 매트릭스, 영향도와 난이도 기준의 우선순위 개선안, 다음 실행 단계를 정리하세요.';
+};
+
+$('discussionClear').onclick = () => {
+  $('discussionTranscript').innerHTML = '<div class="empty">토론을 시작하면 발언 내용이 여기에 표시됩니다.</div>';
+  $('discussionResult').hidden = true;
+  $('discussionResultBody').textContent = '';
+  $('discussionProgress').textContent = '';
+  resetDiscussionUsage();
+};
+
+$('discussionGo').onclick = async () => {
+  const topic = $('discussionTopic').value.trim();
+  if (!topic) {
+    $('discussionWarn').innerHTML = '<span class="bad">⚠ 토론 주제를 입력하세요.</span>';
+    return;
+  }
+
+  $('discussionTranscript').innerHTML = '';
+  $('discussionResult').hidden = true;
+  $('discussionResultBody').textContent = '';
+  resetDiscussionUsage();
+  $('discussionGo').disabled = true;
+  $('discussionStop').disabled = false;
+  stopDiscussionTimer = startTimer($('discussionTimer'));
+
+  try {
+    const scribeModel = $('discussionScribeModel').value.trim();
+    const discussion = {
+      topic,
+      turns: Number($('discussionTurns').value),
+      participants: discussionParticipants.map((participant) => ({
+        provider: participant.provider,
+        role: participant.role.trim(),
+        ...(participant.model.trim() ? { model: participant.model.trim() } : {}),
+      })),
+      scribe: {
+        provider: $('discussionScribe').value,
+        ...(scribeModel ? { model: scribeModel } : {}),
+      },
+      summaryInstructions: $('discussionSummaryInstructions').value.trim(),
+    };
+    discussionUsage.expectedCalls = discussion.turns + 1;
+    renderDiscussionUsage();
+    const { runId: id } = await api('/api/discussion/run', {
+      method: 'POST',
+      body: JSON.stringify({ discussion, cwd: $('cwd').value }),
+    });
+    discussionRunId = id;
+
+    stream(id, {
+      onEvent: (event) => {
+        if (event.type === 'usage') addDiscussionUsageEvent(event);
+        if (event.type === 'discussion.turn.start') {
+          $('discussionProgress').textContent = `${event.turn}/${event.totalTurns}턴 · ${event.provider} 발언 중…`;
+          const entry = document.createElement('div');
+          entry.className = 'discussion-entry pending';
+          entry.id = 'discussion-turn-' + event.turn;
+          entry.innerHTML = `<b>${event.turn}턴 · ${esc(event.provider)}</b> <span class="badge badge-muted">${esc(event.role)}</span>
+            <div class="discussion-text muted">발언을 생성하고 있습니다…</div>`;
+          $('discussionTranscript').appendChild(entry);
+        }
+        if (event.type === 'discussion.turn.end') {
+          const entry = $('discussion-turn-' + event.turn);
+          if (!entry) return;
+          entry.className = 'discussion-entry' + (event.error ? ' failed' : '');
+          entry.querySelector('.discussion-text').textContent = event.error ? `발언 실패: ${event.error}` : event.text;
+          entry.querySelector('.discussion-text').className = 'discussion-text' + (event.error ? ' bad' : '');
+        }
+        if (event.type === 'discussion.summary.start') {
+          $('discussionProgress').textContent = `서기 ${event.provider}가 최종 보고서를 작성 중…`;
+        }
+        if (event.type === 'discussion.summary.end') {
+          $('discussionResult').hidden = false;
+          $('discussionResultBody').textContent = event.text;
+        }
+        if (event.type === 'error') {
+          $('discussionProgress').innerHTML = `<span class="bad">${esc(event.message)}</span>`;
+        }
+      },
+      onDone: (event) => {
+        $('discussionGo').disabled = false;
+        $('discussionStop').disabled = true;
+        if (stopDiscussionTimer) { stopDiscussionTimer(); stopDiscussionTimer = null; }
+        const summary = event.summary || {};
+        if (summary.error) {
+          $('discussionProgress').innerHTML = `<span class="bad">${esc(summary.error)}</span>`;
+        } else {
+          $('discussionProgress').textContent = `완료 · ${summary.turns?.length || 0}턴 · 실패 ${summary.failedTurns || 0}턴`;
+          $('discussionResult').hidden = false;
+          $('discussionResultBody').textContent = summary.summary || '';
+        }
+        syncDiscussionWarn();
+      },
+    });
+  } catch (error) {
+    const issues = error.data?.issues?.map((issue) => `${issue.path}: ${issue.message}`).join(' / ');
+    $('discussionWarn').innerHTML = `<span class="bad">${esc(issues || error.message)}</span>`;
+    $('discussionGo').disabled = false;
+    $('discussionStop').disabled = true;
+    if (stopDiscussionTimer) { stopDiscussionTimer(); stopDiscussionTimer = null; }
+  }
+};
+
+$('discussionStop').onclick = () => {
+  api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId: discussionRunId }) });
+  if (stopDiscussionTimer) { stopDiscussionTimer(); stopDiscussionTimer = null; }
 };
 
 /* ── 작업 공간 (Workspaces) ─────────────────────────────── */
