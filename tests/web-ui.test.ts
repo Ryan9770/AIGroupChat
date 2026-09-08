@@ -55,4 +55,17 @@ describe('웹 UI 페이지', () => {
     // 스크립트가 실행될 수 있다. 산출물은 신뢰할 수 없는 데이터다.
     expect(inlineScript(html)).toMatch(/const esc = /);
   });
+
+  it('설치된 어떤 provider든 계획의 팀장과 수행 모델로 선택할 수 있다', () => {
+    const script = inlineScript(html);
+
+    expect(html).toContain('id="teamLeader"');
+    expect(html).toContain('id="teamWorker"');
+    expect(html).toContain('id="applyTeamPreset"');
+    expect(html).not.toContain('id="presetClaudeLeads"');
+    expect(script).toContain("const leader = $('teamLeader').value");
+    expect(script).toContain('design: withFallback(leader)');
+    expect(script).toContain('review: withFallback(leader)');
+    expect(script).toContain('implement: withFallback(worker)');
+  });
 });

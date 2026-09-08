@@ -63,6 +63,35 @@ async function assess(assertPath: string, worktree: string): Promise<Check[]> {
   }
 }
 
+/** 실제 시도라면 이보다는 오래 걸린다. 그보다 짧으면 CLI가 즉시 튕긴 것이다. */
+const MIN_REAL_ATTEMPT_MS = 15_000;
+
+/**
+ * 이 실행을 품질 측정으로 인정할 수 있는지 판단한다. 인정 못 하면 그 이유.
+ *
+ * 🔴 에이전트가 **시도해서 틀린 것**(0점, 유효한 데이터)과 **애초에 돌지 않은
+ * 것**(무효)은 전혀 다르다. 쿼터가 마르면 워커는 2초 만에 아무것도 안 하고
+ * 끝나는데, 그걸 0점으로 세면 요약표가 "self-review 26%"라고 말한다.
+ * 그건 결과가 아니라 쓰레기다. 실제로 18회 중 15회가 그렇게 기록된 적이 있다.
+ */
+export function judgeValidity(
+  outcomes: { taskId: string; result?: { filesChanged: string[]; durationMs: number } }[],
+  errors: { code: string; message: string }[],
+): string | undefined {
+  const rateLimited = errors.find((e) => e.code === 'rate_limited');
+  if (rateLimited) return `쿼터 소진: ${rateLimited.message.slice(0, 80)}`;
+
+  // 구현 단계가 파일을 하나도 안 건드리고 즉시 끝났으면 아무 일도 없었던 것이다.
+  // 벤더가 쿼터 오류를 구조화해 알려주지 않아도 이 신호는 남는다.
+  const implement = outcomes.find((o) => o.taskId === 'implement');
+  const changed = implement?.result?.filesChanged.length ?? 0;
+  const duration = implement?.result?.durationMs ?? 0;
+  if (changed === 0 && duration < MIN_REAL_ATTEMPT_MS) {
+    return `구현 워커가 ${(duration / 1000).toFixed(1)}초 만에 아무것도 만들지 않고 종료했습니다`;
+  }
+  return undefined;
+}
+
 /**
  * 조건 하나를 한 번 실행하고 채점한다.
  *
@@ -74,6 +103,7 @@ export async function runArm(opts: RunArmOptions): Promise<ArmResult> {
   const repoRoot = await createFixtureRepo(opts.task);
   const notes: string[] = [];
   const providers: Provider[] = [];
+  const providerErrors: { code: string; message: string }[] = [];
   let overclaims = 0;
 
   try {
@@ -102,6 +132,9 @@ export async function runArm(opts: RunArmOptions): Promise<ArmResult> {
       },
       onTaskEnd: (outcome) => {
         if (outcome.note?.includes('변경된 파일이 없습니다')) overclaims += 1;
+        for (const error of outcome.result?.errors ?? []) {
+          providerErrors.push({ code: error.code, message: error.message });
+        }
         if (outcome.state !== 'succeeded') {
           notes.push(`${outcome.taskId}: ${outcome.state}${outcome.note ? ` — ${outcome.note}` : ''}`);
         }
@@ -118,6 +151,7 @@ export async function runArm(opts: RunArmOptions): Promise<ArmResult> {
 
     // agy는 비용을 보고하지 않는다. 0으로 합산하면 싸 보이는 착시가 생긴다.
     const costPartial = providers.includes('antigravity');
+    const invalidReason = judgeValidity(outcomes, providerErrors);
 
     return {
       arm: opts.spec.arm,
@@ -133,6 +167,8 @@ export async function runArm(opts: RunArmOptions): Promise<ArmResult> {
       providers,
       overclaims,
       notes,
+      valid: invalidReason === undefined,
+      ...(invalidReason ? { invalidReason } : {}),
     };
   } finally {
     // 임시 저장소는 매번 지운다. worktree가 남아 있으면 삭제가 막히므로 강제로 지운다.

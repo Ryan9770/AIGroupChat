@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dungeon of the Abyss | Roguelite RPG</title>
+  <meta name="description" content="ROT.js & HTML5 Canvas 기반의 브라우저 로그라이트 던전 RPG 게임">
+
+  <!-- ROT.js Roguelike Online Toolkit (Open Source CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/rot-js@2/dist/rot.js"></script>
+
+  <!-- Google Fonts: Medieval & Retro Pixel Feel -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Press+Start+2P&family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="game-wrapper">
+    <!-- Top Header Bar -->
+    <header class="game-header">
+      <div class="brand">
+        <h1 class="game-title">DUNGEON <span>OF THE</span> ABYSS</h1>
+        <div class="brand-sub">
+          <span class="brand-runes">ᚲ · ᛖ · 𐌀 · ᚱ · ᛇ</span>
+          <span class="game-version">v2.0 Lore & Art Edition</span>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="meta-item">
+          <span class="meta-label">DEPTH</span>
+          <span class="meta-value highlight" id="hudFloor">B1F</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">TURN</span>
+          <span class="meta-value" id="hudTurns">1</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">SOULS</span>
+          <span class="meta-value souls" id="hudSouls">0</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">GOLD</span>
+          <span class="meta-value gold" id="hudGold">0</span>
+        </div>
+        <button class="btn btn--icon" id="btnSoundToggle" title="사운드 켜기/끄기">🔊</button>
+        <button class="btn btn--icon" id="btnPrologue" title="심연의 전설 (Story)">📜</button>
+        <button class="btn btn--icon" id="btnCodex" title="몬스터 도감 (C)">📖</button>
+        <button class="btn btn--icon" id="btnClassSelect" title="직업 변경">🎭</button>
+        <button class="btn btn--icon" id="btnHelp" title="조작 및 도움말">❓</button>
+      </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="game-container">
+      <!-- Left Sidebar: Character Status & Equipment -->
+      <aside class="sidebar sidebar--left">
+        <!-- Player Identity & Vitals -->
+        <section class="panel player-vitals">
+          <div class="player-profile">
+            <div class="player-avatar" id="hudPlayerAvatar">🗡️</div>
+            <div class="player-info">
+              <h3 class="player-name" id="hudPlayerName">그림자 방랑자</h3>
+              <div class="player-subinfo">
+                <span class="player-class-badge" id="hudPlayerClass">워리어</span>
+                <span class="player-level">Lv. <span id="hudLevel">1</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Status Effects -->
+          <div class="status-effects-panel" id="statusEffectsPanel">
+            <div class="status-effects-list" id="statusEffectsList">
+              <!-- Rendered dynamically: e.g. 🔥 화상 2턴, 🛡️ 보호막 +20 -->
+            </div>
+          </div>
+
+          <!-- Status Bars -->
+          <div class="stat-bar-group">
+            <div class="stat-bar stat-bar--hp">
+              <div class="stat-bar__label">
+                <span>HP (생명력)</span>
+                <span id="txtHp">100 / 100</span>
+              </div>
+              <div class="stat-bar__track">
+                <div class="stat-bar__fill" id="barHp" style="width: 100%;"></div>
+              </div>
+            </div>
+
+            <div class="stat-bar stat-bar--mp">
+              <div class="stat-bar__label">
+                <span>MP (마나)</span>
+                <span id="txtMp">30 / 30</span>
+              </div>
+              <div class="stat-bar__track">
+                <div class="stat-bar__fill" id="barMp" style="width: 100%;"></div>
+              </div>
+            </div>
+
+            <div class="stat-bar stat-bar--exp">
+              <div class="stat-bar__label">
+                <span>EXP (경험치)</span>
+                <span id="txtExp">0 / 50</span>
+              </div>
+              <div class="stat-bar__track">
+                <div class="stat-bar__fill" id="barExp" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Combat Attributes Grid -->
+          <div class="attributes-grid">
+            <div class="attr-box">
+              <span class="attr-name">⚔️ 공격력</span>
+              <span class="attr-val" id="statAtk">12</span>
+            </div>
+            <div class="attr-box">
+              <span class="attr-name">🛡️ 방어력</span>
+              <span class="attr-val" id="statDef">4</span>
+            </div>
+            <div class="attr-box">
+              <span class="attr-name">⚡ 치명타</span>
+              <span class="attr-val" id="statCrit">10%</span>
+            </div>
+            <div class="attr-box">
+              <span class="attr-name">👁️ 시야</span>
+              <span class="attr-val" id="statFov">8칸</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Equipment Slots -->
+        <section class="panel equipment-panel">
+          <h4 class="panel-title">EQUIPMENT</h4>
+          <div class="equipment-slots">
+            <div class="equip-slot" id="slotWeapon">
+              <div class="equip-icon">🗡️</div>
+              <div class="equip-detail">
+                <span class="equip-type">주 무기</span>
+                <span class="equip-name" id="nameWeapon">녹슨 숏소드 (+4)</span>
+              </div>
+            </div>
+            <div class="equip-slot" id="slotArmor">
+              <div class="equip-icon">🛡️</div>
+              <div class="equip-detail">
+                <span class="equip-type">방어구</span>
+                <span class="equip-name" id="nameArmor">가죽 튜닉 (+2)</span>
+              </div>
+            </div>
+            <div class="equip-slot" id="slotRing">
+              <div class="equip-icon">💍</div>
+              <div class="equip-detail">
+                <span class="equip-type">장신구</span>
+                <span class="equip-name" id="nameRing">활력의 반지 (+15 HP)</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Class Skills (1~4 Hotkeys) -->
+        <section class="panel skills-panel">
+          <h4 class="panel-title">CLASS SKILLS (1~4)</h4>
+          <div class="skills-grid skills-grid--4">
+            <button class="skill-btn" id="btnSkill1" title="[1번 키] 강타">
+              <span class="skill-key">1</span>
+              <span class="skill-icon" id="iconSkill1">💥</span>
+              <span class="skill-name" id="nameSkill1">강타</span>
+              <span class="skill-cost" id="costSkill1">8 MP</span>
+            </button>
+            <button class="skill-btn" id="btnSkill2" title="[2번 키] 방어 태세">
+              <span class="skill-key">2</span>
+              <span class="skill-icon" id="iconSkill2">🛡️</span>
+              <span class="skill-name" id="nameSkill2">철벽</span>
+              <span class="skill-cost" id="costSkill2">10 MP</span>
+            </button>
+            <button class="skill-btn" id="btnSkill3" title="[3번 키] 휠윈드">
+              <span class="skill-key">3</span>
+              <span class="skill-icon" id="iconSkill3">🌪️</span>
+              <span class="skill-name" id="nameSkill3">휠윈드</span>
+              <span class="skill-cost" id="costSkill3">14 MP</span>
+            </button>
+            <button class="skill-btn" id="btnSkill4" title="[4번 키] 전장의 함성">
+              <span class="skill-key">4</span>
+              <span class="skill-icon" id="iconSkill4">📯</span>
+              <span class="skill-name" id="nameSkill4">함성</span>
+              <span class="skill-cost" id="costSkill4">16 MP</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Relics & Passive Blessings Panel -->
+        <section class="panel relics-panel">
+          <h4 class="panel-title">RELICS & BLESSINGS</h4>
+          <div class="relics-list" id="relicsList">
+            <span class="relic-empty">획득한 유물이 없습니다.</span>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Center: Main Canvas Viewport -->
+      <section class="viewport-section">
+        <div class="canvas-container" id="canvasContainer">
+          <canvas id="gameCanvas" width="760" height="540"></canvas>
+          <div class="canvas-overlay" id="canvasOverlay"></div>
+
+          <!-- Floor Narration Cinematic Banner -->
+          <div class="floor-banner" id="floorBanner">
+            <div class="floor-banner__decor">
+              <span class="floor-banner__rune" id="floorBannerRune">𐌀</span>
+            </div>
+            <div class="floor-banner__body">
+              <h2 class="floor-banner__title" id="floorBannerTitle">B1F: 잊혀진 납골당</h2>
+              <div class="floor-banner__divider"><span>◈</span></div>
+              <p class="floor-banner__subtitle" id="floorBannerSub">“첫 번째 깊이, 이름을 삼킨 물의 묘지. 이곳에서 죽은 자는 잠들지 못한다. 불러 줄 이름을 잃었으므로.”</p>
+            </div>
+          </div>
+
+          <!-- Boss Cinematic Dialogue Banner -->
+          <div class="boss-dialogue-banner" id="bossDialogueBanner">
+            <div class="boss-dialogue__portrait-wrap">
+              <div class="boss-dialogue__portrait" id="bossPortrait">💀</div>
+              <span class="boss-dialogue__phase" id="bossPhaseBadge">PHASE 1</span>
+            </div>
+            <div class="boss-dialogue__content">
+              <div class="boss-dialogue__header">
+                <span class="boss-dialogue__speaker" id="bossSpeaker">죽음의 기사 에드릭</span>
+                <span class="boss-dialogue__title" id="bossSubTitle">타락한 성기사단장</span>
+              </div>
+              <p class="boss-dialogue__text" id="bossText">“너 또한 이 차가운 묘실의 뼈무더기가 될 운명이다!”</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Touch / On-Screen Controls for Mobile -->
+        <div class="touch-controls" id="touchControls">
+          <div class="dpad">
+            <button class="dpad-btn up" data-dir="0,-1">▲</button>
+            <button class="dpad-btn left" data-dir="-1,0">◀</button>
+            <button class="dpad-btn center" id="btnWait">●</button>
+            <button class="dpad-btn right" data-dir="1,0">▶</button>
+            <button class="dpad-btn down" data-dir="0,1">▼</button>
+          </div>
+          <div class="action-buttons">
+            <button class="action-btn" id="btnTouchInventory">🎒 가방</button>
+            <button class="action-btn" id="btnTouchStairs">🪜 이동</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Sidebar: Combat Log & Minimap -->
+      <aside class="sidebar sidebar--right">
+        <!-- Minimap & Legend -->
+        <section class="panel minimap-panel">
+          <h4 class="panel-title">DUNGEON RADAR</h4>
+          <canvas id="minimapCanvas" width="220" height="150"></canvas>
+          <div class="minimap-legend">
+            <span class="legend-item"><span class="dot dot--player"></span> 나</span>
+            <span class="legend-item"><span class="dot dot--monster"></span> 적</span>
+            <span class="legend-item"><span class="dot dot--shrine"></span> 제단</span>
+            <span class="legend-item"><span class="dot dot--stairs"></span> 계단</span>
+          </div>
+        </section>
+
+        <!-- Combat & Event Log -->
+        <section class="panel log-panel">
+          <div class="panel-head">
+            <h4 class="panel-title">CHRONICLES (전투 로그)</h4>
+            <button class="log-clear-btn" id="btnClearLog">비우기</button>
+          </div>
+          <div class="log-container" id="logContainer">
+            <div class="log-entry log-system">지하 1층(B1F)의 심연에 발을 들였습니다. 어둠 속에 적들이 도사립니다.</div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- Bottom Action Ribbon -->
+    <footer class="game-footer">
+      <div class="controls-hint">
+        <span><b>[이동/공격]</b> 방향키/WASD</span>
+        <span><b>[대기]</b> 스페이스바/5</span>
+        <span><b>[스킬]</b> 1, 2, 3, 4</span>
+        <span><b>[가방]</b> I</span>
+        <span><b>[도감]</b> C</span>
+        <span><b>[계단 하강]</b> > / E</span>
+      </div>
+      <div class="footer-actions">
+        <button class="btn btn--primary" id="btnOpenCodex">📖 몬스터 도감 (C)</button>
+        <button class="btn btn--primary" id="btnOpenInventory">🎒 인벤토리 (I)</button>
+        <button class="btn btn--gold" id="btnOpenMetaShop">🏛️ 영혼의 성소 (Shop)</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modals -->
+
+  <!-- 1. Inventory & Item Modal -->
+  <div class="modal" id="modalInventory" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalInventory"></div>
+    <div class="modal__dialog">
+      <div class="modal__header">
+        <h3 class="modal__title">🎒 INVENTORY (<span id="invCount">0</span> / 16)</h3>
+        <button class="modal__close" data-close="modalInventory">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="inventory-grid" id="inventoryGrid">
+          <!-- Populated by JS -->
+        </div>
+        <div class="item-detail-card" id="itemDetailCard">
+          <div class="item-detail-card__empty">아이템을 선택하면 상세 정보가 표시됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Meta-Upgrade Sanctuary Modal (Roguelite Shop) -->
+  <div class="modal" id="modalMetaShop" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalMetaShop"></div>
+    <div class="modal__dialog modal__dialog--wide">
+      <div class="modal__header">
+        <h3 class="modal__title">🏛️ 영혼의 성소 (PERMANENT UPGRADES)</h3>
+        <button class="modal__close" data-close="modalMetaShop">✕</button>
+      </div>
+      <div class="modal__body">
+        <p class="modal__desc">
+          심연에서 획득한 <strong>영혼 조각(Souls: <span id="shopSoulsCount">0</span>)</strong>을 바쳐 캐릭터를 영구적으로 강화하세요.<br>
+          영구 강화 효과는 사망 후 다음 번 탐험에도 그대로 유지됩니다.
+        </p>
+        <div class="upgrade-cards" id="upgradeCards">
+          <!-- Upgrades rendered dynamically -->
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--primary" data-close="modalMetaShop">확인 및 탐험 계속</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2.5. Dungeon Merchant Shop Modal (Greed's Black Market) -->
+  <div class="modal" id="modalDungeonShop" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalDungeonShop"></div>
+    <div class="modal__dialog modal__dialog--wide">
+      <div class="modal__header">
+        <h3 class="modal__title gold-glow">🧙 방랑 상인 그리드의 암시장 (BLACK MARKET)</h3>
+        <button class="modal__close" data-close="modalDungeonShop">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="shop-header-info">
+          <p class="modal__desc">
+            “심연의 어둠 속에서 마주친 게 인연이군. 금화만 충분하다면 무엇이든 내주지.”
+          </p>
+          <div class="shop-gold-badge">
+            <span>보유 골드: </span><strong class="gold" id="shopGoldCount">0</strong> G
+          </div>
+        </div>
+        <div class="shop-offers-grid" id="shopOfferList">
+          <!-- Dynamic shop items populated by JS -->
+        </div>
+      </div>
+      <div class="modal__footer shop-modal-footer">
+        <button class="btn btn--danger" id="btnShopSteal">🗡️ 상점 주인을 공격하여 물건 훔치기 (위험)</button>
+        <button class="btn btn--primary" id="btnShopLeave" data-close="modalDungeonShop">상점 나가기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Level Up Choice Modal -->
+  <div class="modal" id="modalLevelUp" aria-hidden="true">
+    <div class="modal__backdrop"></div>
+    <div class="modal__dialog">
+      <div class="modal__header">
+        <h3 class="modal__title gold-glow">⭐ LEVEL UP! (레벨 <span id="lvlUpNum">2</span>)</h3>
+      </div>
+      <div class="modal__body">
+        <p class="modal__desc">심연의 힘이 당신을 채웁니다. 성장시킬 스탯 하나를 선택하세요:</p>
+        <div class="levelup-choices">
+          <button class="levelup-card" data-choice="hp">
+            <span class="choice-icon">❤️</span>
+            <span class="choice-title">체력 증강</span>
+            <span class="choice-desc">최대 체력 +25 & 즉시 완전 회복</span>
+          </button>
+          <button class="levelup-card" data-choice="atk">
+            <span class="choice-icon">⚔️</span>
+            <span class="choice-title">무력 연마</span>
+            <span class="choice-desc">기본 공격력 +3 & 치명타율 +3%</span>
+          </button>
+          <button class="levelup-card" data-choice="def">
+            <span class="choice-icon">🛡️</span>
+            <span class="choice-title">강철 피부</span>
+            <span class="choice-desc">기본 방어력 +2 & 최대 마나 +10</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Game Over Screen Modal -->
+  <div class="modal modal--full" id="modalGameOver" aria-hidden="true">
+    <div class="modal__dialog modal__dialog--death">
+      <h2 class="death-title">YOU DIED</h2>
+      <p class="death-subtitle">당신의 육신은 심연에 묻혔으나, 영혼은 성소로 되돌아왔습니다.</p>
+      
+      <div class="death-stats">
+        <div class="death-stat-box">
+          <span class="death-stat-num" id="endFloor">B1F</span>
+          <span class="death-stat-label">도달 층수</span>
+        </div>
+        <div class="death-stat-box">
+          <span class="death-stat-num" id="endTurns">0</span>
+          <span class="death-stat-label">생존 턴</span>
+        </div>
+        <div class="death-stat-box">
+          <span class="death-stat-num gold" id="endKills">0</span>
+          <span class="death-stat-label">처치한 몬스터</span>
+        </div>
+        <div class="death-stat-box">
+          <span class="death-stat-num souls" id="endSouls">0</span>
+          <span class="death-stat-label">회수한 영혼 조각</span>
+        </div>
+      </div>
+
+      <div class="death-actions">
+        <button class="btn btn--gold btn--lg" id="btnShopAfterDeath">🏛️ 영혼 강화 샵 열기</button>
+        <button class="btn btn--primary btn--lg" id="btnRestartGame">⚔️ 심연으로 다시 강하</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Victory Screen Modal -->
+  <div class="modal modal--full" id="modalVictory" aria-hidden="true">
+    <div class="modal__dialog modal__dialog--victory">
+      <h2 class="victory-title">VICTORY</h2>
+      <p class="victory-subtitle">심연 5층의 절대 군주 '심연의 용 섀도우 드레이크'를 처치하고 지옥의 심연을 정복했습니다!</p>
+      
+      <div class="death-stats">
+        <div class="death-stat-box">
+          <span class="death-stat-num gold" id="vicGold">0</span>
+          <span class="death-stat-label">획득 골드</span>
+        </div>
+        <div class="death-stat-box">
+          <span class="death-stat-num souls" id="vicSouls">0</span>
+          <span class="death-stat-label">획득 영혼</span>
+        </div>
+        <div class="death-stat-box">
+          <span class="death-stat-num" id="vicTurns">0</span>
+          <span class="death-stat-label">클리어 턴수</span>
+        </div>
+        <div class="death-stat-box">
+          <span class="death-stat-num highlight" id="vicKills">0</span>
+          <span class="death-stat-label">처치한 마수</span>
+        </div>
+      </div>
+
+      <div class="victory-lore-box" id="vicLoreBox">
+        <h4 class="vic-lore-heading" id="vicLoreTitle">👑 심연의 정복자</h4>
+        <p class="vic-lore-text" id="vicLoreText">고대 암흑용의 포효가 멎고, 천 년 동안 억눌려 있던 수천의 영혼들이 찬란한 빛이 되어 해방되었습니다.</p>
+      </div>
+
+      <div class="death-actions">
+        <button class="btn btn--primary btn--lg" id="btnNewRunPlus">🏆 영혼을 보존하고 새 회차 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Hero Class Selection Modal -->
+  <div class="modal modal--full" id="modalClassSelect" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalClassSelect"></div>
+    <div class="modal__dialog modal__dialog--wide modal__dialog--classes">
+      <div class="modal__header">
+        <h3 class="modal__title gold-glow">🎭 영웅의 운명 선택 (CHOOSE YOUR HERO)</h3>
+        <button class="modal__close" data-close="modalClassSelect">✕</button>
+      </div>
+      <div class="modal__body">
+        <p class="modal__desc">심연으로 강하할 영웅을 선택하세요. 각 클래스는 고유의 기본 스탯, 지속 효과 및 4개의 액티브 스킬을 가집니다.</p>
+        <div class="classes-grid" id="classCardsContainer">
+          <!-- Class Cards -->
+          <div class="class-card selected" data-class="warrior">
+            <div class="class-card__badge">전사 (Gawain)</div>
+            <div class="class-card__avatar">🗡️</div>
+            <h4 class="class-card__name">철벽의 기사 가웨인</h4>
+            <p class="class-card__quote">“오늘은 방패 뒤에 숨지 않는다.”</p>
+            <p class="class-card__desc">선대 기사단의 억울한 누명을 밝히고 지워진 이름을 되찾기 위한 속죄의 여정. 방패 방어와 광역 회전베기로 전선을 분쇄합니다.</p>
+            <div class="class-card__stats">
+              <span>❤️ HP 130</span>
+              <span>🔷 MP 25</span>
+              <span>⚔️ ATK 14</span>
+              <span>🛡️ DEF 6</span>
+            </div>
+            <div class="class-card__skills">
+              <span class="skill-tag">💥 강타</span>
+              <span class="skill-tag">🛡️ 철벽</span>
+              <span class="skill-tag">🌪️ 휠윈드</span>
+              <span class="skill-tag">📯 전장의 함성</span>
+            </div>
+            <button class="btn btn--gold class-select-btn" data-class="warrior">가웨인으로 강하</button>
+          </div>
+
+          <div class="class-card" data-class="rogue">
+            <div class="class-card__badge">암살자 (Valeria)</div>
+            <div class="class-card__avatar">🥷</div>
+            <h4 class="class-card__name">그림자 암살자 발레리아</h4>
+            <p class="class-card__quote">“비밀은 묻히지 않아. 묻은 자를 기다릴 뿐.”</p>
+            <p class="class-card__desc">길드를 팔아넘긴 흑막을 폭로하고 과거의 죄책감을 끊어내기 위한 밤의 칼날. 치명타, 독안개, 그림자 급습에 특화되어 있습니다.</p>
+            <div class="class-card__stats">
+              <span>❤️ HP 95</span>
+              <span>🔷 MP 35</span>
+              <span>⚔️ ATK 16</span>
+              <span>⚡ 치명타 25%</span>
+            </div>
+            <div class="class-card__skills">
+              <span class="skill-tag">🗡️ 독침찌르기</span>
+              <span class="skill-tag">👣 그림자도약</span>
+              <span class="skill-tag">🧪 독안개</span>
+              <span class="skill-tag">💨 연막회피</span>
+            </div>
+            <button class="btn btn--primary class-select-btn" data-class="rogue">발레리아로 강하</button>
+          </div>
+
+          <div class="class-card" data-class="mage">
+            <div class="class-card__badge">현자 (Eldrian)</div>
+            <div class="class-card__avatar">🧙‍♂️</div>
+            <h4 class="class-card__name">공허의 현자 엘드리안</h4>
+            <p class="class-card__quote">“미지수는 공포가 아니다. 아직 듣지 못한 답이다.”</p>
+            <p class="class-card__desc">실종된 스승의 자취와 심연의 차원 균열을 봉합하려는 학자. 풍부한 마나로 원거리 화염구, 광역 빙결 및 순간 치유를 구사합니다.</p>
+            <div class="class-card__stats">
+              <span>❤️ HP 85</span>
+              <span>🔷 MP 65</span>
+              <span>⚔️ ATK 11</span>
+              <span>👁️ 시야 9칸</span>
+            </div>
+            <div class="class-card__skills">
+              <span class="skill-tag">🔥 화염폭발</span>
+              <span class="skill-tag">❄️ 눈보라</span>
+              <span class="skill-tag">🌀 비전왜곡</span>
+              <span class="skill-tag">✨ 천상치유</span>
+            </div>
+            <button class="btn btn--primary class-select-btn" data-class="mage">엘드리안으로 강하</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Mysterious Shrine Event Modal -->
+  <div class="modal" id="modalShrine" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalShrine"></div>
+    <div class="modal__dialog modal__dialog--shrine">
+      <div class="modal__header">
+        <h3 class="modal__title gold-glow" id="shrineTitle">🏛️ 신비로운 제단</h3>
+        <button class="modal__close" data-close="modalShrine">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="shrine-visual">
+          <div class="shrine-large-icon" id="shrineIcon">🩸</div>
+          <h4 class="shrine-name" id="shrineName">피의 제단 (Blood Altar)</h4>
+          <p class="shrine-lore" id="shrineLore">고대 제단에서 어두운 피의 기운이 피어오릅니다. 당신의 생명력을 대가로 미지의 힘을 제안합니다.</p>
+        </div>
+        <div class="shrine-choices" id="shrineChoices">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--primary" data-close="modalShrine">제단을 지나치기 (닫기)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Bestiary & Relics Codex Modal -->
+  <div class="modal modal--full" id="modalCodex" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalCodex"></div>
+    <div class="modal__dialog modal__dialog--wide modal__dialog--codex">
+      <div class="modal__header">
+        <h3 class="modal__title gold-glow">📖 심연의 마수 & 유물 도감 (CODEX)</h3>
+        <button class="modal__close" data-close="modalCodex">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="codex-tabs">
+          <button class="codex-tab active" data-tab="monsters">👾 몬스터 도감</button>
+          <button class="codex-tab" data-tab="relics">💎 유물 & 비보</button>
+          <button class="codex-tab" data-tab="floors">🗺️ 5대 심연 층계</button>
+          <button class="codex-tab" data-tab="chronicles">📜 심연의 연대기</button>
+        </div>
+        <div class="chronicles-subtabs" id="chroniclesSubtabs" style="display: none;">
+          <button class="chronicle-filter active" data-cat="all">전체 (All)</button>
+          <button class="chronicle-filter" data-cat="origin">🏛️ 기원과 제국</button>
+          <button class="chronicle-filter" data-cat="heroes">⚔️ 세 영웅 열전</button>
+          <button class="chronicle-filter" data-cat="floors">🗺️ 층별 전승</button>
+          <button class="chronicle-filter" data-cat="runes">🪨 고대 룬 & 엔딩</button>
+        </div>
+        <div class="codex-content" id="codexContent">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--primary" data-close="modalCodex">도감 닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. Help / Instructions Modal -->
+  <div class="modal" id="modalHelp" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalHelp"></div>
+    <div class="modal__dialog modal__dialog--wide">
+      <div class="modal__header">
+        <h3 class="modal__title">📖 게임 가이드 & 조작법</h3>
+        <button class="modal__close" data-close="modalHelp">✕</button>
+      </div>
+      <div class="modal__body help-content">
+        <h4>🎮 조작 방법</h4>
+        <ul>
+          <li><b>이동 및 공격:</b> 방향키 또는 W / A / S / D (적 방향 이동 시 자동 기본 공격)</li>
+          <li><b>턴 넘기기 / 대기:</b> 스페이스바 또는 숫자 5</li>
+          <li><b>클래스 액티브 스킬:</b> 숫자키 1, 2, 3, 4 (클래스별로 다른 고유 스킬 및 마나 소모)</li>
+          <li><b>인벤토리 열기:</b> I 또는 B</li>
+          <li><b>몬스터 & 유물 도감:</b> C 키</li>
+          <li><b>계단 하강:</b> 계단(`>`) 위에서 E 또는 > 키</li>
+        </ul>
+
+        <h4>⚔️ 게임 시스템 및 컨텐츠 안내</h4>
+        <ul>
+          <li><b>3개 클래스:</b> 전사(철벽 & 광역 분쇄), 도적(치명타 & 맹독 & 순간이동), 마법사(원거리 화염구 & 광역 빙결 & 치유).</li>
+          <li><b>5개 심연 계층:</b> B1F 납골당 ➔ B2F 균류 동굴 ➔ B3F 해골 묘실(미니보스 데스나이트) ➔ B4F 용암 회랑 ➔ B5F 공허의 옥좌(최종 보스 드레이크).</li>
+          <li><b>상태 이상(Status Effects):</b> 화상(매 턴 불 피해), 중독(매 턴 독 피해), 빙결/기절(행동 불가), 보호막(피해 흡수).</li>
+          <li><b>함정 & 신비로운 제단:</b> 가시 함정, 독가스 분출구, 마력 룬과 함께 피의 제단, 생명의 샘, 영혼의 비석 등 위험과 보상이 공존하는 오브젝트가 던전에 배치됩니다.</li>
+          <li><b>영구 메타 강화:</b> 사망하더라도 획득한 영혼 조각(Souls)은 성소에 보존되어 영구 스탯을 강화할 수 있습니다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. Prologue / Lore Story Modal -->
+  <div class="modal modal--full" id="modalPrologue" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalPrologue"></div>
+    <div class="modal__dialog modal__dialog--wide modal__dialog--lore">
+      <div class="modal__header">
+        <h3 class="modal__title gold-glow">📜 심연의 서: 네메시스의 기원과 에레보스의 몰락</h3>
+        <button class="modal__close" data-close="modalPrologue">✕</button>
+      </div>
+      <div class="modal__body lore-scroll-body">
+        <div class="lore-emblem">𐌀 · ᛖ · ᚲ · ᚱ · ᛇ</div>
+        <h4 class="lore-headline">“기억을 잃은 자들의 심연, 그리고 속박된 별의 수호룡”</h4>
+
+        <div class="lore-section">
+          <h5 class="lore-section__title">◈ 제1막: 무명시대와 네메시스 심연</h5>
+          <p class="lore-paragraph">
+            세계가 아직 굳지 않았던 태초의 무명시대, 창조신들은 태어나지 못한 생명과 선택되지 않은 가능성들을 대지 아래에 묻었습니다.
+            이 잔여 의식들은 사람의 기억을 먹어치우며 검은 바다 <strong>“네메시스 심연(The Nemesis Abyss)”</strong>이 되었고,
+            신들은 다섯 겹의 봉인을 세운 뒤 별의 불꽃에서 태어난 수호룡 <strong>녹티라크(Noctirac)</strong>에게 마지막 문을 맡겼습니다.
+          </p>
+        </div>
+
+        <div class="lore-section">
+          <h5 class="lore-section__title">◈ 제2막: 황제의 광기와 검은 성배</h5>
+          <p class="lore-paragraph">
+            수천 년 뒤 봉인 위에 건설된 에레보스 제국의 마지막 황제 <strong>오렐리우스 3세</strong>는 역병으로 죽어가는 딸 리시아 공주를 살리고자 심연의 기억 재생력을 탐했습니다.
+            그는 다섯 봉인을 훼손하고 백성들의 영혼을 액화하여 수호룡에게 접목하는 <strong>‘검은 성배 의식’</strong>을 강행했습니다.
+            의식이 파멸로 끝난 날 밤, 수도 아우렐리아 전체가 지하로 함몰되었습니다. 수호룡은 수만 백성의 공포와 황제의 집착에 잠식되어 자신의 진명을 잊은 채 <strong>‘섀도우 드레이크’</strong>라는 괴수로 변모했습니다.
+          </p>
+        </div>
+
+        <div class="lore-section">
+          <h5 class="lore-section__title">◈ 제3막: 세 영웅의 숙명</h5>
+          <div class="lore-hero-cards">
+            <div class="lore-hero-item">
+              <span class="lore-hero-role">🛡️ 기사 가웨인</span>
+              <p>반역자로 몰려 생매장된 선대 기사단장 에드릭의 억울한 누명을 벗기고, 지워진 진실과 전우들의 이름을 되찾기 위해.</p>
+            </div>
+            <div class="lore-hero-item">
+              <span class="lore-hero-role">🗡️ 암살자 발레리아</span>
+              <p>길드를 심연에 팔아넘긴 황실 의뢰주 ‘흰 가면’의 정체를 폭로하고, 실험 증인을 제거했던 과거의 죄책감을 끊기 위해.</p>
+            </div>
+            <div class="lore-hero-item">
+              <span class="lore-hero-role">✨ 현자 엘드리안</span>
+              <p>실종된 스승 세라피온의 행방과 심연의 차원 균열 수식을 풀고, 불완전한 인간성의 가치를 증명하기 위해.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="lore-section">
+          <h5 class="lore-section__title">◈ 제4막: 다섯 애도의 룬과 당신의 사명</h5>
+          <p class="lore-paragraph">
+            심연은 물질보다 기억을 먼저 썩힙니다. 오래 머문 자는 이름과 목적조차 잊어버립니다.
+            각 층에 흩어진 다섯 비석의 애도의 룬—<strong>NA(기억)</strong>, <strong>ETH(숨)</strong>, <strong>KA(맹세)</strong>, <strong>RHA(피)</strong>, <strong>EL(선택)</strong>을 복원하십시오.
+            용을 처치하여 비극의 순환을 반복할 것인가, 아니면 지워진 진명을 불러 그에게 선택의 자유를 되돌려줄 것인가... 결단은 당신의 몫입니다.
+          </p>
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--gold btn--lg" data-close="modalPrologue">⚔️ 운명의 심연으로 강하하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

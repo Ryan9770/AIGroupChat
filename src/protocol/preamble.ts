@@ -11,6 +11,8 @@ export interface PreambleParams {
   baseDrift?: BaseDrift;
   /** 질문을 받아줄 사람이 붙어 있는가. 없으면 ask를 권하지 않는다. */
   canAsk: boolean;
+  /** 팀장(Leader / Design) 역할인가. AiKA 모드 위임 가이드라인을 주입한다. */
+  isLeader?: boolean | undefined;
 }
 
 /**
@@ -26,6 +28,25 @@ export interface PreambleParams {
 export function buildDispatchPreamble(params: PreambleParams): string {
   const { cli, workerHandle, taskId, dispatchId } = params;
   const ids = `--task-id ${taskId} --dispatch-id ${dispatchId}`;
+
+  const leaderBlock = params.isLeader
+    ? `
+  # =========================================================================
+  # [AiKA 모드: 토큰 절약 및 하위 워커 위임 수칙 (팀장 전용)]
+  # 규칙: 직접 100라인이 넘는 큰 파일을 Read하거나 보일러플레이트 코드를 짜느라
+  # 비싼 컨텍스트와 5시간 쿼터 토큰을 낭비하지 마세요.
+  # 대신 아래의 선언형 경량 모드(antigravity 워커)를 호출하여 압축 요약본만 받으세요.
+  #
+  # 1. 대용량 파일 분석 위임 (antigravity 기반):
+  #    -> 대상 파일을 분석하여 인터페이스/시그니처/의존성 압축 요약본만 반환받습니다.
+  ${cli} mode run bulk-reader --files "<파일경로또는패턴>" --query "<분석목표/질의>"
+  #
+  # 2. 보일러플레이트/단위 테스트 초안 생성 위임 (antigravity 기반):
+  #    -> 정형화된 코드 생성을 하위 워커에게 위임하고 결과 요약을 보고받습니다.
+  ${cli} mode run draft-writer --spec "<작업명세>" --context "<참고파일또는패턴>"
+  # =========================================================================
+`
+    : '';
 
   const askBlock = params.canAsk
     ? `
@@ -69,7 +90,7 @@ Task ID: ${taskId}   Dispatch ID: ${dispatchId}
   # 실패를 산문에만 적고 succeeded로 보내지 마라. 그냥 조용히 끝내지도 마라 —
   # 이 보고가 없으면 코디네이터는 작업을 실패로 판정한다.
   ${cli} worker done --outcome succeeded --body "<3문장 요약>" ${ids}
-${askBlock}
+${leaderBlock}${askBlock}
   # 완료 전에 막혔을 때. 코디네이터가 뭔가 해줘야 진행할 수 있는 경우.
   ${cli} worker escalate --subject "막힘: <이유>" --body "<상세>" ${ids}
 

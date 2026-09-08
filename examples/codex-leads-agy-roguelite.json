@@ -1,0 +1,32 @@
+{
+  "objective": "오픈소스 기술 기반 로그라이트 RPG 게임(Dungeon of the Forgotten) 제작",
+  "routes": {
+    "design": ["codex"],
+    "implement": ["antigravity", "claude"],
+    "review": ["codex", "claude"]
+  },
+  "tasks": [
+    {
+      "id": "game-design",
+      "role": "design",
+      "spec": "오픈소스 라이브러리(ROT.js 등)와 HTML5 Canvas를 활용한 브라우저 실행 가능한 로그라이트 RPG 게임(Dungeon of the Forgotten)의 상세 아키텍처와 게임 규칙을 설계하라. 절차적 던전 생성, 턴제/액션 전투 시스템, 플레이어 스탯/인벤토리/아이템(무기, 방어구, 물약), 적 AI, 레벨업 및 영구 성장(로그라이트 메타 진행), 레트로 사운드 이펙트(Web Audio API)를 포함하여 구체적인 파일 구조와 컴포넌트 설계를 도출하라.",
+      "workspace": "none"
+    },
+    {
+      "id": "game-implement",
+      "role": "implement",
+      "spec": "참고 자료의 게임 설계를 바탕으로 roguelite-game 디렉토리에 바로 실행 가능한 완성본 게임(index.html, style.css, game.js 등)을 구현하라. 절차적 맵 생성, 시야(FOV), 몬스터 AI, 인벤토리/장비창, 사운드, 승리/패배 및 재도전 루프가 완벽히 동작하도록 생략 없이 코드를 작성하라.",
+      "dependsOn": ["game-design"],
+      "context": ["game-design"],
+      "workspace": "none"
+    },
+    {
+      "id": "game-review",
+      "role": "review",
+      "spec": "구현된 roguelite-game의 파일들을 검토하라. 게임 설계서의 핵심 요소(절차적 맵, 전투, 인벤토리, 레벨업, 사운드)가 누락 없이 구현되었는지 검증하고 개선점을 평가하라.",
+      "dependsOn": ["game-implement"],
+      "context": ["game-design", "game-implement"],
+      "workspace": "none"
+    }
+  ]
+}

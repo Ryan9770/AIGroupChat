@@ -3,194 +3,715 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>conductor</title>
+<title>conductor — Multi-Agent Orchestrator</title>
 <style>
-:root{
-  --bg:#fbfbfa; --panel:#fff; --line:#e3e2df; --ink:#1f1e1c; --muted:#6f6d68;
-  --accent:#3b6ea5; --ok:#2f7d4f; --warn:#96690d; --bad:#b03a2e; --code:#f4f3f0;
+:root {
+  --bg: #f8fafc;
+  --panel: #ffffff;
+  --panel-glass: rgba(255, 255, 255, 0.88);
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-light: #eff6ff;
+  --ok: #16a34a;
+  --ok-light: #f0fdf4;
+  --warn: #d97706;
+  --warn-light: #fffbeb;
+  --bad: #dc2626;
+  --bad-light: #fef2f2;
+  --code: #0f172a;
+  --code-text: #f8fafc;
+  --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --modal-overlay: rgba(15, 23, 42, 0.55);
 }
-@media (prefers-color-scheme:dark){
-  :root{
-    --bg:#191817; --panel:#212020; --line:#343331; --ink:#eceae6; --muted:#9a9791;
-    --accent:#7aa7d6; --ok:#69b088; --warn:#d3a545; --bad:#e08272; --code:#1a1918;
+
+[data-theme="dark"], @media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0f19;
+    --panel: #131b2e;
+    --panel-glass: rgba(19, 27, 46, 0.88);
+    --line: #1e293b;
+    --line-strong: #334155;
+    --ink: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-hover: #0ea5e9;
+    --accent-light: #082f49;
+    --ok: #4ade80;
+    --ok-light: #052e16;
+    --warn: #fbbf24;
+    --warn-light: #451a03;
+    --bad: #f87171;
+    --bad-light: #450a0a;
+    --code: #070a13;
+    --code-text: #e2e8f0;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    --modal-overlay: rgba(0, 0, 0, 0.75);
   }
 }
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font:14px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif}
-code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
-header{display:flex;align-items:baseline;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line)}
-header h1{font-size:15px;margin:0;letter-spacing:.02em}
-header .sub{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;min-width:0}
-header #cwdLabel{flex:1}
-header #conn{flex:none}
-nav{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--line);background:var(--panel)}
-nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);
-  padding:10px 14px;font:inherit;cursor:pointer}
-nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
-main{padding:22px;max-width:1180px}
-section[hidden]{display:none}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
-  margin:0 0 10px;font-weight:600}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
-.grid{display:grid;gap:12px}
-label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
-input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;
-  background:var(--bg);color:var(--ink);font:inherit}
-textarea{resize:vertical;min-height:88px}
-button.act{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 16px;
-  font:inherit;cursor:pointer}
-button.act:disabled{opacity:.45;cursor:default}
-button.ghost{background:none;border:1px solid var(--line);border-radius:6px;padding:6px 12px;
-  color:var(--ink);font:inherit;cursor:pointer}
-button.danger{border-color:var(--bad);color:var(--bad)}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-td .row{flex-wrap:nowrap}
-th,td{white-space:nowrap}
-td.wrap{white-space:normal}
-.checks{display:flex;gap:16px;flex-wrap:wrap}
-.checks label{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px;margin:0}
-.checks input{width:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
-  letter-spacing:.06em;padding:6px 10px;border-bottom:1px solid var(--line)}
-td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-tr:last-child td{border-bottom:0}
-.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;border:1px solid var(--line)}
-.ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)} .muted{color:var(--muted)}
-pre.stream{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px;
-  max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:12.5px;margin:0}
-pre.diff{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px;
-  max-height:520px;overflow:auto;font-size:12.5px;margin:0}
-.diff .add{color:var(--ok)} .diff .del{color:var(--bad)} .diff .hd{color:var(--accent)}
-.ask{border:1px solid var(--accent);border-radius:8px;padding:14px;margin-bottom:14px;background:var(--panel)}
-.ask .q{margin-bottom:10px}
-.opts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.empty{color:var(--muted);padding:18px 0}
-.task{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin-bottom:10px}
-.task.run{border-left-color:var(--accent)}
-.task.ok{border-left-color:var(--ok)}
-.task.bad{border-left-color:var(--bad)}
-.hint{color:var(--muted);font-size:12px;margin-top:6px}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+}
+code, pre, .mono { font-family: ui-monospace, "Cascadia Code", "Fira Code", Consolas, monospace; }
+
+/* ── 상단 헤더 ─────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--panel-glass);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.brand-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+}
+header .sub {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+header #cwdLabel {
+  flex: 1;
+  background: var(--bg);
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+header .header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid var(--line);
+}
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
+  animation: pulse 1.8s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+/* ── 네비게이션 ───────────────────────────────────────────── */
+nav {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+nav button {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 13.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+nav button:hover { color: var(--ink); }
+nav button[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── 레이아웃 & 카드 ──────────────────────────────────────── */
+main {
+  padding: 24px;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+section[hidden] { display: none; }
+h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin: 0 0 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--card-shadow);
+}
+.grid { display: grid; gap: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+td .row { flex-wrap: nowrap; }
+
+/* ── 스탯 위젯 (대시보드) ─────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+}
+.stat-box .stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.stat-box .stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.stat-box .stat-desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ── 폼 요소 ──────────────────────────────────────────────── */
+label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+input, select, textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+textarea { resize: vertical; min-height: 90px; }
+
+/* ── 버튼 ─────────────────────────────────────────────────── */
+button.act {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 18px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button.act:hover:not(:disabled) { background: var(--accent-hover); }
+button.act:disabled { opacity: .45; cursor: not-allowed; }
+button.ghost {
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 7px 14px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button.ghost:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
+button.ghost:disabled { opacity: .45; cursor: not-allowed; }
+button.danger { border-color: var(--bad); color: var(--bad); }
+button.danger:hover:not(:disabled) { background: var(--bad-light); }
+
+.chips-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.chip {
+  background: var(--bg);
+  border: 1px dashed var(--line-strong);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.chip:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+
+.checks { display: flex; gap: 18px; flex-wrap: wrap; }
+.checks label { display: flex; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; font-weight: normal; margin: 0; cursor: pointer; }
+.checks input { width: auto; cursor: pointer; }
+
+/* ── 테이블 ──────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+th, td { white-space: nowrap; }
+td.wrap { white-space: normal; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.badge-ok { background: var(--ok-light); color: var(--ok); border-color: var(--ok); }
+.badge-warn { background: var(--warn-light); color: var(--warn); border-color: var(--warn); }
+.badge-bad { background: var(--bad-light); color: var(--bad); border-color: var(--bad); }
+.badge-muted { background: var(--bg); color: var(--muted); border-color: var(--line); }
+
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); } .muted { color: var(--muted); }
+
+/* ── 스트림 콘솔 & 로그 ──────────────────────────────────── */
+.console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+pre.stream {
+  background: var(--code);
+  color: var(--code-text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 460px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12.5px;
+  margin: 0;
+  line-height: 1.6;
+}
+pre.diff {
+  background: var(--code);
+  color: var(--code-text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 520px;
+  overflow: auto;
+  font-size: 12.5px;
+  margin: 0;
+}
+.diff .add { color: #4ade80; } .diff .del { color: #f87171; } .diff .hd { color: #38bdf8; font-weight: bold; }
+
+.ask {
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
+  background: var(--panel);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  animation: askPulse 2s infinite ease-in-out;
+}
+@keyframes askPulse {
+  0% { border-color: var(--accent); }
+  50% { border-color: #818cf8; }
+  100% { border-color: var(--accent); }
+}
+.ask .q { font-size: 14px; margin-bottom: 12px; }
+.opts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+
+.empty { text-align: center; color: var(--muted); padding: 32px 0; font-size: 13.5px; }
+
+/* ── Task 파이프라인 카드 ─────────────────────────────────── */
+.task {
+  border-left: 4px solid var(--line-strong);
+  background: var(--bg);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.task.run {
+  border-left-color: var(--accent);
+  background: var(--accent-light);
+}
+.task.ok {
+  border-left-color: var(--ok);
+  background: var(--ok-light);
+}
+.task.bad {
+  border-left-color: var(--bad);
+  background: var(--bad-light);
+}
+.hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+/* ── 모달 ─────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-overlay);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+}
+.modal-overlay[hidden] { display: none; }
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 640px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);
+}
+.modal-box h3 { margin: 0 0 14px; font-size: 16px; }
 </style>
 </head>
 <body>
+
+<!-- ── 상단 헤더 ─────────────────────────────────────────── -->
 <header>
-  <h1>conductor</h1>
+  <a class="brand" href="#">
+    <div class="brand-icon">⚡</div>
+    <span>conductor</span>
+  </a>
   <span class="sub" id="cwdLabel"></span>
-  <span class="sub" id="conn"></span>
+  <div class="header-controls">
+    <div class="status-pill" id="connPill">
+      <div class="pulse-dot"></div>
+      <span id="conn">연결 중…</span>
+    </div>
+    <button class="ghost" id="btnThemeToggle" title="화면 모드 전환 (Light/Dark)">🌙</button>
+  </div>
 </header>
 
+<!-- ── 네비게이션 탭 ─────────────────────────────────────── -->
 <nav>
-  <button data-tab="status" aria-selected="true">현황</button>
-  <button data-tab="run" aria-selected="false">실행</button>
-  <button data-tab="plan" aria-selected="false">계획</button>
-  <button data-tab="ws" aria-selected="false">작업 공간</button>
+  <button data-tab="status" aria-selected="true">📊 대시보드 및 현황</button>
+  <button data-tab="run" aria-selected="false">🚀 단일 위임 (Run)</button>
+  <button data-tab="plan" aria-selected="false">🗺️ 멀티 에이전트 계획 (Plan)</button>
+  <button data-tab="ws" aria-selected="false">🌿 작업 공간 (Workspaces)</button>
 </nav>
 
 <main>
-  <!-- ── 현황 ─────────────────────────────────────────────── -->
+  <!-- ── 1. 현황 및 대시보드 ──────────────────────────────── -->
   <section id="tab-status">
-    <div class="card">
-      <h2>Provider</h2>
-      <table><thead><tr>
-        <th>PROVIDER</th><th>버전</th><th>로그인</th><th>정보</th><th>쿼터</th>
-      </tr></thead><tbody id="provRows"></tbody></table>
-      <div class="hint" id="provNotes"></div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">AI 에이전트 현황</div>
+        <div class="stat-value" id="statUsableCount">- / -</div>
+        <div class="stat-desc">정상 로그인 및 헤드리스 가능</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">격리 작업 공간</div>
+        <div class="stat-value" id="statWsCount">0</div>
+        <div class="stat-desc">Git Worktree 안전 경계</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">기본 워커 모드</div>
+        <div class="stat-value" style="font-size:16px;color:var(--accent)">Antigravity + Codex</div>
+        <div class="stat-desc">AiKA 모드 &amp; 멀티 협약 활성화</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">시스템 검사</div>
+        <div class="stat-value" style="font-size:15px">
+          <button class="ghost" id="btnRefreshStatus" style="padding:4px 10px">🔄 상태 새로고침</button>
+        </div>
+        <div class="stat-desc">Doctor 프로브 재실행</div>
+      </div>
     </div>
+
     <div class="card">
-      <h2>대상 폴더</h2>
+      <h2>
+        <span>AI 코딩 CLI Provider 목록</span>
+        <span class="hint" style="margin:0">헤드리스 능력 및 쿼터 현황</span>
+      </h2>
+      <table>
+        <thead>
+          <tr>
+            <th>PROVIDER</th>
+            <th>버전</th>
+            <th>로그인</th>
+            <th>계정/인증 정보</th>
+            <th>쿼터 여유도</th>
+            <th>권한 정책</th>
+          </tr>
+        </thead>
+        <tbody id="provRows"></tbody>
+      </table>
+      <div class="hint" id="provNotes" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card">
+      <h2>대상 작업 디렉토리 (CWD)</h2>
       <input id="cwd" spellcheck="false">
-      <div class="hint">git 저장소여야 작업 공간 격리를 쓸 수 있습니다. 커밋이 최소 하나 필요합니다.</div>
+      <div class="hint">Git 저장소여야 작업 공간 격리(Worktree)를 안전하게 사용할 수 있습니다.</div>
     </div>
   </section>
 
-  <!-- ── 실행 ─────────────────────────────────────────────── -->
+  <!-- ── 2. 단일 실행 ─────────────────────────────────────── -->
   <section id="tab-run" hidden>
     <div class="card">
-      <h2>단일 실행</h2>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-        <div><label>에이전트</label><select id="runAgent"></select></div>
-        <div><label>모드</label><select id="runMode">
-          <option value="plan">plan — 읽기 전용</option>
-          <option value="write">write — 파일 수정</option>
+      <h2>단일 에이전트 위임</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+        <div><label>담당 에이전트</label><select id="runAgent"></select></div>
+        <div><label>실행 모드</label><select id="runMode">
+          <option value="plan">plan — 읽기 전용 분석 (안전)</option>
+          <option value="write">write — 코드 및 파일 직접 수정</option>
         </select></div>
-        <div><label>모델 (선택)</label><input id="runModel" placeholder="예: gpt-5.4-mini" spellcheck="false"></div>
+        <div><label>모델 지정 (선택)</label><input id="runModel" placeholder="예: gpt-5.4-mini" spellcheck="false"></div>
       </div>
-      <div style="margin-top:12px"><label>지시</label>
-        <textarea id="runPrompt" placeholder="이 프로젝트가 무슨 일을 하는지 3문장으로 설명하라"></textarea></div>
-      <div class="checks" style="margin:12px 0">
-        <label><input type="checkbox" id="runWs" checked> 작업 공간 격리</label>
-        <label><input type="checkbox" id="runYolo"> 도구 자동 승인 (yolo)</label>
-        <label><input type="checkbox" id="runProto" checked> 되묻기 허용</label>
+
+      <div style="margin-top:14px">
+        <label>프롬프트 지시</label>
+        <textarea id="runPrompt" placeholder="지시할 태스크를 구체적으로 입력하세요..."></textarea>
+        <div class="chips-row">
+          <span class="chip" data-quick="이 프로젝트의 핵심 구조와 아키텍처를 3문장으로 분석 요약하라.">🔍 구조 분석</span>
+          <span class="chip" data-quick="단위 테스트(npm test)를 점검하고 잠재적 취약점이나 결함을 진단하라.">🧪 테스트 진단</span>
+          <span class="chip" data-quick="roguelite-game 디렉토리의 핵심 파일들과 로직 흐름을 설명하라.">🎮 게임 엔진 분석</span>
+        </div>
       </div>
+
+      <div class="checks" style="margin:16px 0">
+        <label><input type="checkbox" id="runWs" checked> 작업 공간 격리 (Worktree 생성)</label>
+        <label><input type="checkbox" id="runYolo"> 도구 자동 승인 (yolo 모드)</label>
+        <label><input type="checkbox" id="runProto" checked> 워커 프로토콜 (되묻기 및 협약 보고 허용)</label>
+      </div>
+
       <div class="row">
-        <button class="act" id="runGo">실행</button>
-        <button class="ghost" id="runStop" disabled>중단</button>
+        <button class="act" id="runGo">▶ 실행 시작</button>
+        <button class="ghost danger" id="runStop" disabled>■ 중단</button>
         <span class="muted" id="runMeta"></span>
+        <span class="muted mono" id="runTimer" style="margin-left:auto"></span>
       </div>
       <div class="hint" id="runWarn"></div>
     </div>
+
     <div id="runAsk"></div>
-    <div class="card"><h2>출력</h2><pre class="stream" id="runOut"></pre></div>
-    <div class="card" id="runResult" hidden><h2>결과</h2><div id="runResultBody"></div></div>
+
+    <div class="card">
+      <div class="console-header">
+        <h2 style="margin:0">실시간 터미널 출력</h2>
+        <div class="row" style="gap:6px">
+          <button class="ghost" id="btnCopyRunLog" style="padding:4px 10px;font-size:12px">📋 로그 복사</button>
+          <button class="ghost" id="btnClearRunLog" style="padding:4px 10px;font-size:12px">🧹 지우기</button>
+        </div>
+      </div>
+      <pre class="stream" id="runOut"></pre>
+    </div>
+
+    <div class="card" id="runResult" hidden>
+      <h2>최종 정산 결과</h2>
+      <div id="runResultBody"></div>
+    </div>
   </section>
 
-  <!-- ── 계획 ─────────────────────────────────────────────── -->
+  <!-- ── 3. 멀티 에이전트 계획 ────────────────────────────── -->
   <section id="tab-plan" hidden>
+    <!-- 역할 라우팅 카드 -->
     <div class="card">
-      <h2>역할별 담당</h2>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))" id="routeGrid"></div>
-      <div class="hint">비워두면 기본 라우팅을 씁니다. 지정하면 교차 검증 규칙보다 우선합니다.
-        <span id="routeConfig"></span></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" id="presetClaudeLeads">Claude 팀장 · agy 수행</button>
-        <button class="ghost" id="presetClear">기본값으로</button>
+      <h2>
+        <span>역할별 Provider 라우팅</span>
+        <span class="hint" style="margin:0" id="routeConfig"></span>
+      </h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="routeGrid"></div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:14px">
+        <div><label>팀장 (설계 &amp; 검토)</label><select id="teamLeader"></select></div>
+        <div><label>수행 (구현 워커)</label><select id="teamWorker"></select></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="ghost" id="applyTeamPreset">👑 팀 프리셋 적용</button>
+        <button class="ghost" id="presetClear">기본값으로 초기화</button>
       </div>
     </div>
+
+    <!-- Task 정의 카드 -->
     <div class="card">
-      <h2>Task</h2>
+      <div class="row" style="margin-bottom:12px">
+        <h2 style="margin:0;flex:1">파이프라인 태스크 (DAG Tasks)</h2>
+        <select id="planPresetSelect" style="max-width:320px;font-size:13px">
+          <option value="">📂 예시 템플릿 선택…</option>
+          <option value="story-art">📜 [스토리/아트] 심연의 던전 세계관 바이블 &amp; 시네마틱 연출</option>
+          <option value="game-upgrades">✨ [차세대 업그레이드] BGM, 상점, 미믹, 유물 시너지</option>
+          <option value="roguelite-rpg">🎮 [RPG 기본] 오픈소스 로그라이트 RPG 제작</option>
+          <option value="claude-agy">⚡ [Claude 팀장] 설계/검토 Claude · 구현 Antigravity</option>
+          <option value="readme-sample">📝 [기본 샘플] README 설치 안내 섹션 추가</option>
+        </select>
+        <button class="ghost" id="btnImportPlanJson">📥 JSON 불러오기</button>
+        <button class="ghost" id="btnExportPlanJson">📤 JSON 저장</button>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label>전체 목표 (Objective)</label>
+        <input id="planObjective" spellcheck="false" placeholder="계획의 전체 목표를 요약하세요">
+      </div>
+
       <div id="taskList"></div>
-      <div class="row" style="margin-top:10px">
+
+      <div class="row" style="margin-top:14px">
         <button class="ghost" id="addTask">+ Task 추가</button>
-        <button class="ghost" id="loadSample">예시 불러오기</button>
+        <button class="ghost" id="loadSample">기본 예시 불러오기</button>
       </div>
-      <div style="margin-top:14px"><label>목표</label><input id="planObjective" spellcheck="false"></div>
     </div>
+
+    <!-- 실행 컨트롤러 카드 -->
     <div class="card">
       <div class="row">
-        <button class="ghost" id="planPreview">배정 미리보기</button>
-        <button class="act" id="planGo">계획 실행</button>
-        <button class="ghost" id="planStop" disabled>중단</button>
-        <label style="margin:0;display:flex;align-items:center;gap:6px;color:var(--ink)">
-          <input type="checkbox" id="planYolo" style="width:auto"> yolo</label>
-        <span style="width:150px"><input id="planBudget" placeholder="예산 $ (선택)"></span>
+        <button class="ghost" id="planPreview">👁️ 배정 미리보기</button>
+        <button class="act" id="planGo">🚀 계획 실행 (Plan Run)</button>
+        <button class="ghost danger" id="planStop" disabled>■ 실행 중단</button>
+        <label style="margin:0;display:flex;align-items:center;gap:6px;color:var(--ink);cursor:pointer">
+          <input type="checkbox" id="planYolo" checked style="width:auto"> yolo (자동 도구 승인)</label>
+        <span style="width:160px"><input id="planBudget" placeholder="예산 $ 상한 (선택)"></span>
+        <span class="muted mono" id="planTimer" style="margin-left:auto"></span>
       </div>
       <div class="hint" id="planWarn"></div>
-      <div id="planPreviewOut" style="margin-top:12px"></div>
+      <div id="planPreviewOut" style="margin-top:14px"></div>
     </div>
+
     <div id="planAsk"></div>
-    <div class="card"><h2>진행</h2><div id="planTasks"></div><pre class="stream" id="planOut" style="margin-top:12px"></pre></div>
-    <div class="card" id="planResult" hidden><h2>결과</h2><div id="planResultBody"></div></div>
+
+    <div class="card">
+      <div class="console-header">
+        <h2 style="margin:0">태스크 진행 현황 및 실시간 로그</h2>
+        <div class="row" style="gap:6px">
+          <button class="ghost" id="btnCopyPlanLog" style="padding:4px 10px;font-size:12px">📋 로그 복사</button>
+          <button class="ghost" id="btnClearPlanLog" style="padding:4px 10px;font-size:12px">🧹 지우기</button>
+        </div>
+      </div>
+      <div id="planTasks" style="margin-bottom:12px"></div>
+      <pre class="stream" id="planOut"></pre>
+    </div>
+
+    <div class="card" id="planResult" hidden>
+      <h2>파이프라인 최종 결과</h2>
+      <div id="planResultBody"></div>
+    </div>
   </section>
 
-  <!-- ── 작업 공간 ─────────────────────────────────────────── -->
+  <!-- ── 4. 작업 공간 ─────────────────────────────────────── -->
   <section id="tab-ws" hidden>
     <div class="card">
-      <div class="row"><h2 style="margin:0;flex:1">작업 공간</h2>
-        <button class="ghost" id="wsRefresh">새로고침</button></div>
-      <table><thead><tr><th>ID</th><th>브랜치</th><th>변경</th><th></th></tr></thead>
-        <tbody id="wsRows"></tbody></table>
-      <div class="empty" id="wsEmpty" hidden>conductor가 만든 작업 공간이 없습니다.</div>
+      <div class="row">
+        <h2 style="margin:0;flex:1">Git Worktree 작업 공간 목록</h2>
+        <button class="ghost" id="wsRefresh">🔄 새로고침</button>
+      </div>
+      <p class="hint" style="margin:4px 0 14px">각 워커 에이전트가 격리된 브랜치에서 안전하게 작업한 변경 내역입니다.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>WORKSPACE ID</th>
+            <th>격리 브랜치</th>
+            <th>수정된 파일 수</th>
+            <th>작업</th>
+          </tr>
+        </thead>
+        <tbody id="wsRows"></tbody>
+      </table>
+      <div class="empty" id="wsEmpty" hidden>현재 생성된 격리 작업 공간이 없습니다.</div>
     </div>
+
     <div class="card" id="wsDiffCard" hidden>
-      <div class="row"><h2 style="margin:0;flex:1" id="wsDiffTitle">변경 내용</h2>
-        <button class="ghost" id="wsDiffClose">닫기</button></div>
+      <div class="row">
+        <h2 style="margin:0;flex:1" id="wsDiffTitle">변경 내용 (Diff)</h2>
+        <button class="ghost" id="btnCopyDiff" style="font-size:12px">📋 Diff 복사</button>
+        <button class="ghost" id="wsDiffClose">✕ 닫기</button>
+      </div>
       <pre class="diff" id="wsDiff"></pre>
     </div>
   </section>
 </main>
+
+<!-- ── JSON Import 모달 ──────────────────────────────────── -->
+<div class="modal-overlay" id="modalImportJson" hidden>
+  <div class="modal-box">
+    <h3>📥 계획 JSON 불러오기</h3>
+    <p class="hint" style="margin-top:0">Conductor 계획 JSON 파일의 내용을 아래에 붙여넣으세요.</p>
+    <textarea id="importJsonText" style="min-height:220px;font-family:ui-monospace,monospace;font-size:12px" placeholder='{\n  "objective": "...",\n  "tasks": [...]\n}'></textarea>
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button class="ghost" id="btnCancelImport">취소</button>
+      <button class="act" id="btnApplyImport">적용하기</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const token = location.hash.slice(1);
@@ -207,7 +728,27 @@ async function api(path, options = {}) {
   return data;
 }
 
-/* ── 탭 ─────────────────────────────────────────────────── */
+/* ── 테마 토글 (Dark / Light) ─────────────────────────────── */
+function initTheme() {
+  const saved = localStorage.getItem('CONDUCTOR_THEME');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  updateThemeIcon();
+}
+function updateThemeIcon() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+    (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  $('btnThemeToggle').textContent = isDark ? '☀️' : '🌙';
+}
+$('btnThemeToggle').onclick = () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('CONDUCTOR_THEME', next);
+  updateThemeIcon();
+};
+initTheme();
+
+/* ── 탭 전환 ──────────────────────────────────────────────── */
 document.querySelectorAll('nav button').forEach((btn) => {
   btn.onclick = () => {
     document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
@@ -216,13 +757,25 @@ document.querySelectorAll('nav button').forEach((btn) => {
   };
 });
 
-/* ── 현황 ───────────────────────────────────────────────── */
+/* ── 타이머 헬퍼 ─────────────────────────────────────────── */
+function startTimer(el) {
+  const start = Date.now();
+  el.textContent = '00:00';
+  const id = setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000);
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    el.textContent = `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }, 1000);
+  return () => clearInterval(id);
+}
+
+/* ── 현황 대시보드 ───────────────────────────────────────── */
 let providers = [];
 async function loadStatus() {
-  // doctor 프로브가 네트워크를 타서 몇 초 걸린다. 빈 표를 보여주면 고장난 것처럼 보인다.
   $('conn').textContent = '확인 중…';
   if (!$('provRows').children.length) {
-    $('provRows').innerHTML = '<tr><td colspan="5" class="muted">provider 상태를 확인하는 중입니다…</td></tr>';
+    $('provRows').innerHTML = '<tr><td colspan="6" class="muted">Provider 상태를 프로브하고 있습니다…</td></tr>';
   }
   try {
     const data = await api('/api/status');
@@ -231,31 +784,44 @@ async function loadStatus() {
     setCwdLabel();
 
     $('provRows').innerHTML = providers.map((p) => {
-      const auth = p.authed === true ? '<span class="ok">OK</span>'
-        : p.authed === false ? '<span class="bad">안 됨</span>'
-        : '<span class="warn">미확인</span>';
-      const q = !p.availability.usable ? `<span class="bad">${esc(p.availability.reason || '차단')}</span>`
-        : p.availability.strained ? `<span class="warn">${esc(p.availability.reason || '')}</span>`
-        : '<span class="muted">여유</span>';
-      return `<tr><td><b>${esc(p.provider)}</b> <span class="muted mono">${esc(p.bin)}</span></td>
-        <td class="mono">${p.installed ? esc(p.version || '?') : '<span class="bad">미설치</span>'}</td>
-        <td>${auth}</td><td class="muted">${esc(p.summary || '-')}</td><td>${q}</td></tr>`;
+      const auth = p.authed === true ? '<span class="badge badge-ok">✓ OK</span>'
+        : p.authed === false ? '<span class="badge badge-bad">✗ 미인증</span>'
+        : '<span class="badge badge-warn">? 미확인</span>';
+      const q = !p.availability.usable ? `<span class="badge badge-bad">${esc(p.availability.reason || '차단')}</span>`
+        : p.availability.strained ? `<span class="badge badge-warn">${esc(p.availability.reason || '혼잡')}</span>`
+        : '<span class="badge badge-ok">여유</span>';
+      const perm = p.commandPermission === 'all-or-nothing'
+        ? '<span class="badge badge-warn" title="명령별 선택 승인 불가">일괄 승인 필요</span>'
+        : '<span class="badge badge-muted">샌드박스 지원</span>';
+
+      return `<tr>
+        <td><b>${esc(p.provider)}</b> <span class="muted mono">(${esc(p.bin)})</span></td>
+        <td class="mono">${p.installed ? esc(p.version || '설치됨') : '<span class="bad">미설치</span>'}</td>
+        <td>${auth}</td>
+        <td class="muted">${esc(p.summary || '-')}</td>
+        <td>${q}</td>
+        <td>${perm}</td>
+      </tr>`;
     }).join('');
 
-    $('provNotes').innerHTML = providers.flatMap((p) => p.notes.map((n) => `· <b>${esc(p.provider)}</b> ${esc(n)}`)).join('<br>');
+    $('provNotes').innerHTML = providers.flatMap((p) => p.notes.map((n) => `· <b>${esc(p.provider)}</b>: ${esc(n)}`)).join('<br>');
 
     const usable = providers.filter((p) => p.installed && p.authed === true);
     $('runAgent').innerHTML = usable.map((p) => `<option value="${esc(p.provider)}">${esc(p.provider)}</option>`).join('');
     $('conn').textContent = `${usable.length}/${providers.length} 사용 가능`;
+    $('statUsableCount').textContent = `${usable.length} / ${providers.length}`;
+
     renderRoutes();
+    renderTeamPresetOptions();
     syncRunWarn();
     syncPlanWarn();
   } catch (err) {
-    $('conn').innerHTML = `<span class="bad">연결 실패 — 토큰이 포함된 주소로 접속했는지 확인하세요</span>`;
+    $('conn').innerHTML = `<span class="bad">연결 실패 (토큰 확인)</span>`;
   }
 }
+$('btnRefreshStatus').onclick = loadStatus;
+
 function setCwdLabel() {
-  // 전체 경로는 길어서 헤더를 밀어낸다. 뒤쪽 두 조각만 보여준다.
   const parts = $('cwd').value.split(/[\\/]+/).filter(Boolean);
   $('cwdLabel').textContent = parts.length > 2 ? '…/' + parts.slice(-2).join('/') : $('cwd').value;
   $('cwdLabel').title = $('cwd').value;
@@ -267,7 +833,10 @@ function stream(runId, { out, onEvent, onDone }) {
   const source = new EventSource(`/api/events/${runId}?token=${encodeURIComponent(token)}`);
   source.onmessage = (message) => {
     const event = JSON.parse(message.data);
-    if (event.type === 'log' && out) { out.textContent += event.text; out.scrollTop = out.scrollHeight; }
+    if (event.type === 'log' && out) {
+      out.textContent += event.text;
+      out.scrollTop = out.scrollHeight;
+    }
     onEvent?.(event);
     if (event.type === 'done' || event.type === 'error') {
       if (event.type === 'done') { source.close(); onDone?.(event); }
@@ -281,17 +850,17 @@ function renderAsk(container, runId, event) {
   const box = document.createElement('div');
   box.className = 'ask';
   box.id = 'ask-' + event.questionId;
-  box.innerHTML = `<div class="q"><b>워커가 질문했습니다</b><br>${esc(event.question)}</div>
+  box.innerHTML = `<div class="q"><b>🔔 워커 에이전트가 질문을 보냈습니다:</b><br><span style="font-size:14.5px">${esc(event.question)}</span></div>
     <div class="opts">${(event.options || []).map((o) => `<button class="ghost opt">${esc(o)}</button>`).join('')}</div>
-    <div class="row"><input class="ans" placeholder="답변을 입력하세요" style="flex:1">
-    <button class="act send">보내기</button></div>`;
+    <div class="row"><input class="ans" placeholder="직접 답변을 입력하세요..." style="flex:1">
+    <button class="act send">답변 전송</button></div>`;
   container.appendChild(box);
 
   const input = box.querySelector('.ans');
   const send = async (value) => {
     box.querySelectorAll('button,input').forEach((el) => (el.disabled = true));
     await api('/api/answer', { method: 'POST', body: JSON.stringify({ runId, questionId: event.questionId, body: value }) });
-    box.innerHTML = `<div class="muted">답변함: ${esc(value)}</div>`;
+    box.innerHTML = `<div class="muted">✓ 답변 완료: <b>${esc(value)}</b></div>`;
   };
   box.querySelectorAll('.opt').forEach((b) => (b.onclick = () => send(b.textContent)));
   box.querySelector('.send').onclick = () => send(input.value);
@@ -299,21 +868,18 @@ function renderAsk(container, runId, event) {
   input.focus();
 }
 
-/* ── 단일 실행 ──────────────────────────────────────────── */
-let runSource = null, runId = null;
+/* ── 단일 실행 (Run) ─────────────────────────────────────── */
+let runSource = null, runId = null, stopRunTimer = null;
 function syncRunWarn() {
   const yolo = $('runYolo').checked, ws = $('runWs').checked, proto = $('runProto').checked;
   const agent = providers.find((p) => p.provider === $('runAgent').value);
   const notes = [];
 
-  // 협약은 워커가 셸로 보고하게 만든다. 명령을 골라 허용할 수 없는 provider는
-  // 자동 승인 없이는 보고를 못 해 무조건 실패한다.
   if (proto && !yolo && agent?.commandPermission === 'all-or-nothing') {
-    notes.push(`<span class="bad">⚠ ${esc(agent.provider)}는 되묻기/보고에 필요한 명령만 골라 허용할 수 없습니다.
-      <b>도구 자동 승인을 켜거나</b> 되묻기를 끄세요. 지금 상태로는 실행이 반드시 실패합니다.</span>`);
+    notes.push(`<span class="bad">⚠ ${esc(agent.provider)}는 되묻기/보고에 필요한 명령만 골라 허용할 수 없습니다. <b>yolo를 켜거나</b> 되묻기를 끄세요.</span>`);
   }
   if (yolo && !ws) {
-    notes.push('<span class="bad">⚠ 작업 공간 격리 없이 도구를 자동 승인하면 워커가 원본 폴더를 바로 수정합니다.</span>');
+    notes.push('<span class="bad">⚠ 격리 없이 도구를 자동 승인하면 워커가 원본 작업 트리를 즉시 수정합니다.</span>');
   }
   $('runWarn').innerHTML = notes.join('<br>');
 }
@@ -322,10 +888,25 @@ $('runWs').onchange = syncRunWarn;
 $('runProto').onchange = syncRunWarn;
 $('runAgent').onchange = syncRunWarn;
 
+// 퀵 프롬프트 칩
+document.querySelectorAll('[data-quick]').forEach((chip) => {
+  chip.onclick = () => { $('runPrompt').value = chip.dataset.quick; };
+});
+
+// 로그 조작
+$('btnCopyRunLog').onclick = () => {
+  navigator.clipboard.writeText($('runOut').textContent);
+  $('btnCopyRunLog').textContent = '✓ 복사됨!';
+  setTimeout(() => $('btnCopyRunLog').textContent = '📋 로그 복사', 1500);
+};
+$('btnClearRunLog').onclick = () => { $('runOut').textContent = ''; };
+
 $('runGo').onclick = async () => {
   $('runOut').textContent = ''; $('runAsk').innerHTML = '';
   $('runResult').hidden = true; $('runMeta').textContent = '';
   $('runGo').disabled = true; $('runStop').disabled = false;
+  stopRunTimer = startTimer($('runTimer'));
+
   try {
     const body = {
       agent: $('runAgent').value, prompt: $('runPrompt').value, cwd: $('cwd').value,
@@ -340,30 +921,35 @@ $('runGo').onclick = async () => {
       onEvent: (e) => {
         if (e.type === 'question') renderAsk($('runAsk'), id, e);
         if (e.type === 'usage') $('runMeta').textContent =
-          `in ${e.inputTokens} · out ${e.outputTokens}` + (e.costUsd != null ? ` · $${e.costUsd.toFixed(4)}` : '');
+          `Tokens: in ${e.inputTokens} · out ${e.outputTokens}` + (e.costUsd != null ? ` · $${e.costUsd.toFixed(4)}` : '');
         if (e.type === 'error') $('runOut').textContent += `\n✗ ${e.message}\n`;
       },
       onDone: (e) => {
         $('runGo').disabled = false; $('runStop').disabled = true;
+        if (stopRunTimer) { stopRunTimer(); stopRunTimer = null; }
         const s = e.summary || {};
         $('runResult').hidden = false;
         $('runResultBody').innerHTML = s.error
           ? `<span class="bad">${esc(s.error)}</span>`
-          : `<div class="${e.ok ? 'ok' : 'bad'}"><b>${esc(s.outcome || (e.ok ? 'succeeded' : 'failed'))}</b></div>
+          : `<div class="${e.ok ? 'ok' : 'bad'}"><b>상태: ${esc(s.outcome || (e.ok ? 'succeeded' : 'failed'))}</b></div>
              <div style="margin-top:8px">${esc(s.report || '')}</div>
-             ${(s.filesChanged || []).length ? `<div style="margin-top:8px" class="muted">변경: ${s.filesChanged.map(esc).join(', ')}</div>` : ''}
-             ${s.workspace ? `<div class="hint">작업 공간 <b>${esc(s.workspace.id)}</b> — 작업 공간 탭에서 diff를 볼 수 있습니다.</div>` : ''}`;
+             ${(s.filesChanged || []).length ? `<div style="margin-top:8px" class="muted">수정된 파일: ${s.filesChanged.map(esc).join(', ')}</div>` : ''}
+             ${s.workspace ? `<div class="hint">격리 작업 공간: <b>${esc(s.workspace.id)}</b> (작업 공간 탭에서 Diff 확인 가능)</div>` : ''}`;
         loadStatus();
       },
     });
   } catch (err) {
     $('runOut').textContent = '✗ ' + err.message;
     $('runGo').disabled = false; $('runStop').disabled = true;
+    if (stopRunTimer) { stopRunTimer(); stopRunTimer = null; }
   }
 };
-$('runStop').onclick = () => api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId }) });
+$('runStop').onclick = () => {
+  api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId }) });
+  if (stopRunTimer) { stopRunTimer(); stopRunTimer = null; }
+};
 
-/* ── 계획 ───────────────────────────────────────────────── */
+/* ── 멀티 에이전트 계획 (Plan) ──────────────────────────── */
 let tasks = [];
 let routes = {};
 
@@ -371,75 +957,144 @@ const ROLES = ['design', 'implement', 'review', 'custom'];
 function renderRoutes() {
   const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
   $('routeGrid').innerHTML = ROLES.map((role) => `
-    <div><label>${role}</label><select data-role="${role}">
-      <option value="">기본값</option>
+    <div><label>${role.toUpperCase()}</label><select data-role="${role}">
+      <option value="">기본 라우팅</option>
       ${usable.map((p) => `<option value="${p}" ${routes[role]?.[0] === p ? 'selected' : ''}>${p}</option>`).join('')}
     </select></div>`).join('');
 
   $('routeGrid').querySelectorAll('select').forEach((el) => {
     el.onchange = () => {
       const role = el.dataset.role;
-      // 고른 provider를 1순위로 두고, 나머지는 페일오버 후보로 남긴다.
       if (!el.value) delete routes[role];
       else routes[role] = [el.value, ...usable.filter((p) => p !== el.value)];
     };
   });
 }
-$('presetClaudeLeads').onclick = () => {
-  // 설계·검토는 claude가, 구현은 agy가.
-  // 1순위만 두면 쿼터가 차는 순간 실행이 멈춘다. 나머지를 대체 후보로 남긴다.
+
+function renderTeamPresetOptions() {
   const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
-  const withFallback = (first) =>
-    usable.includes(first) ? [first, ...usable.filter((p) => p !== first)] : usable;
+  if ($('teamLeader')) {
+    $('teamLeader').innerHTML = usable.map((p) => `<option value="${p}">${p}</option>`).join('');
+    if (usable.includes('codex')) $('teamLeader').value = 'codex';
+    else if (usable.includes('claude')) $('teamLeader').value = 'claude';
+  }
+  if ($('teamWorker')) {
+    $('teamWorker').innerHTML = usable.map((p) => `<option value="${p}">${p}</option>`).join('');
+    if (usable.includes('antigravity')) $('teamWorker').value = 'antigravity';
+    else if (usable.includes('claude')) $('teamWorker').value = 'claude';
+  }
+}
+
+$('applyTeamPreset').onclick = () => {
+  const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
+  const withFallback = (first) => (usable.includes(first) ? [first, ...usable.filter((p) => p !== first)] : usable);
+  const leader = $('teamLeader').value;
+  const worker = $('teamWorker').value;
   routes = {
-    design: withFallback('claude'),
-    implement: withFallback('antigravity'),
-    review: withFallback('claude'),
+    design: withFallback(leader),
+    implement: withFallback(worker),
+    review: withFallback(leader),
   };
   renderRoutes();
 };
+
 $('presetClear').onclick = () => { routes = {}; renderRoutes(); };
 
 function syncPlanWarn() {
-  // 계획은 협약이 기본 ON이다. 명령을 골라 허용 못 하는 provider가 후보에 있으면
-  // 자동 승인 없이는 그 Task가 반드시 실패한다.
   const blocked = providers
     .filter((p) => p.installed && p.authed === true && p.commandPermission === 'all-or-nothing')
     .map((p) => p.provider);
   $('planWarn').innerHTML =
     !$('planYolo').checked && blocked.length
-      ? `<span class="bad">⚠ ${blocked.join(', ')}가 배정되면 되묻기/보고용 명령이 막혀 그 Task는 실패합니다.
-         <b>yolo를 켜세요</b> (각 Task는 자기 worktree에서만 작업합니다).</span>`
+      ? `<span class="bad">⚠ ${blocked.join(', ')}가 배정되면 되묻기/보고 명령이 차단되어 실패합니다. <b>yolo를 켜세요</b>.</span>`
       : '';
 }
 $('planYolo').onchange = syncPlanWarn;
 
-const SAMPLE = {
-  objective: 'README에 설치 안내 섹션 추가',
-  tasks: [
-    { id: 'design', role: 'design', spec: '저장소를 살펴보고 README에 추가할 설치 섹션 내용을 설계하라. 파일은 수정하지 마라.', dependsOn: [], context: [], workspace: 'none' },
-    { id: 'implement', role: 'implement', spec: 'README.md에 설치 섹션을 추가하라. 참고 자료의 설계를 따르되 저장소 실내용을 우선하라.', dependsOn: ['design'], context: ['design'], workspace: 'new' },
-    { id: 'review', role: 'review', spec: 'git diff HEAD를 검토하고 저장소 실내용과 어긋나는 부분을 나열하라. 파일은 수정하지 마라.', dependsOn: ['implement'], context: ['design', 'implement'], workspace: 'inherit:implement' },
-  ],
+/* ── 템플릿 프리셋 카탈로그 ───────────────────────────────── */
+const PLAN_TEMPLATES = {
+  'story-art': {
+    objective: '로그라이트 RPG(Dungeon of the Abyss)의 기획, 스토리 세계관 및 게임 아트 컨셉 대폭 강화',
+    routes: { design: ['codex'], implement: ['antigravity', 'claude'], review: ['codex', 'claude'] },
+    tasks: [
+      { id: 'lore-and-art-design', role: 'design', spec: '팀장 Codex로서 roguelite-game의 기획, 스토리 세계관, 게임 아트 컨셉을 총괄 기획하라.', dependsOn: [], context: [], workspace: 'none' },
+      { id: 'lore-and-art-implementation', role: 'implement', spec: '워커 Antigravity로서 팀장 Codex가 수립한 기획 및 아트 가이드를 roguelite-game 코드베이스(index.html, style.css, game.js)에 완벽 구현하라.', dependsOn: ['lore-and-art-design'], context: ['lore-and-art-design'], workspace: 'none' },
+      { id: 'lore-and-art-review', role: 'review', spec: '팀장 Codex로서 워커 Antigravity가 구현한 게임 스토리, 아트 컨셉 연동 및 기획 완성도를 종합 검토하라.', dependsOn: ['lore-and-art-implementation'], context: ['lore-and-art-design', 'lore-and-art-implementation'], workspace: 'none' },
+    ]
+  },
+  'game-upgrades': {
+    objective: 'Roguelite RPG(Dungeon of the Abyss) 차세대 기능 업그레이드 (BGM 신시사이저, 상점 NPC, 비밀방/미믹, 유물 시너지)',
+    routes: { design: ['codex'], implement: ['antigravity', 'claude'], review: ['codex', 'claude'] },
+    tasks: [
+      { id: 'feature-spec-design', role: 'design', spec: '팀장 Codex로서 examples/ROGUELITE_UPGRADE_LIST.md의 1순위 핵심 업그레이드(8-bit BGM, 상점, 비밀방, 유물 시너지) 상세 함수 인터페이스를 설계하라.', dependsOn: [], context: [], workspace: 'none' },
+      { id: 'feature-implementation', role: 'implement', spec: '워커 Antigravity로서 팀장 Codex의 설계를 바탕으로 roguelite-game에 신규 기능을 구현하라.', dependsOn: ['feature-spec-design'], context: ['feature-spec-design'], workspace: 'none' },
+      { id: 'feature-qa-review', role: 'review', spec: '팀장 Codex로서 워커 Antigravity가 구현한 기능들의 결함을 평가하고 최종 완료 보고서를 작성하라.', dependsOn: ['feature-implementation'], context: ['feature-spec-design', 'feature-implementation'], workspace: 'none' },
+    ]
+  },
+  'roguelite-rpg': {
+    objective: '오픈소스 기술 기반 로그라이트 RPG 게임(Dungeon of the Abyss) 제작',
+    routes: { design: ['codex'], implement: ['antigravity', 'claude'], review: ['codex', 'claude'] },
+    tasks: [
+      { id: 'game-design', role: 'design', spec: '브라우저 실행 가능한 로그라이트 RPG 아키텍처와 규칙을 설계하라.', dependsOn: [], context: [], workspace: 'none' },
+      { id: 'game-implement', role: 'implement', spec: '설계를 바탕으로 roguelite-game 디렉토리에 index.html, style.css, game.js를 구현하라.', dependsOn: ['game-design'], context: ['game-design'], workspace: 'none' },
+      { id: 'game-review', role: 'review', spec: '구현된 roguelite-game을 검토하고 개선점을 평가하라.', dependsOn: ['game-implement'], context: ['game-design', 'game-implement'], workspace: 'none' },
+    ]
+  },
+  'claude-agy': {
+    objective: 'Claude 설계 및 Antigravity 구현 파이프라인',
+    routes: { design: ['claude'], implement: ['antigravity'], review: ['claude'] },
+    tasks: [
+      { id: 'architecture', role: 'design', spec: '작업 요구사항을 분석하고 변경 설계서를 도출하라.', dependsOn: [], context: [], workspace: 'none' },
+      { id: 'implement', role: 'implement', spec: '설계서에 맞춰 코드를 구현하라.', dependsOn: ['architecture'], context: ['architecture'], workspace: 'new' },
+      { id: 'review', role: 'review', spec: '구현된 변경 사항을 검토하라.', dependsOn: ['implement'], context: ['architecture', 'implement'], workspace: 'inherit:implement' },
+    ]
+  },
+  'readme-sample': {
+    objective: 'README에 설치 안내 섹션 추가',
+    tasks: [
+      { id: 'design', role: 'design', spec: '저장소를 살펴보고 README에 추가할 설치 섹션 내용을 설계하라. 파일은 수정하지 마라.', dependsOn: [], context: [], workspace: 'none' },
+      { id: 'implement', role: 'implement', spec: 'README.md에 설치 섹션을 추가하라. 참고 자료의 설계를 따르되 저장소 실내용을 우선하라.', dependsOn: ['design'], context: ['design'], workspace: 'new' },
+      { id: 'review', role: 'review', spec: 'git diff HEAD를 검토하고 저장소 실내용과 어긋나는 부분을 나열하라. 파일은 수정하지 마라.', dependsOn: ['implement'], context: ['design', 'implement'], workspace: 'inherit:implement' },
+    ]
+  }
 };
+
+$('planPresetSelect').onchange = (e) => {
+  const key = e.target.value;
+  if (!key || !PLAN_TEMPLATES[key]) return;
+  loadPlanTemplate(PLAN_TEMPLATES[key]);
+};
+
+function loadPlanTemplate(tpl) {
+  $('planObjective').value = tpl.objective;
+  tasks = JSON.parse(JSON.stringify(tpl.tasks));
+  if (tpl.routes) {
+    routes = JSON.parse(JSON.stringify(tpl.routes));
+    renderRoutes();
+  }
+  renderTasks();
+}
 
 function renderTasks() {
   $('taskList').innerHTML = tasks.map((t, i) => `
-    <div class="card" style="margin-bottom:10px;padding:12px">
+    <div class="card" style="margin-bottom:12px;padding:14px;background:var(--bg)">
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-        <div><label>ID</label><input data-i="${i}" data-k="id" value="${esc(t.id)}"></div>
-        <div><label>역할</label><select data-i="${i}" data-k="role">
+        <div><label>TASK ID</label><input data-i="${i}" data-k="id" value="${esc(t.id)}"></div>
+        <div><label>역할 (ROLE)</label><select data-i="${i}" data-k="role">
           ${['design','implement','review','custom'].map((r) => `<option ${t.role===r?'selected':''}>${r}</option>`).join('')}
         </select></div>
-        <div><label>의존 (쉼표)</label><input data-i="${i}" data-k="dependsOn" value="${esc((t.dependsOn||[]).join(','))}"></div>
-        <div><label>참고 자료 (쉼표)</label><input data-i="${i}" data-k="context" value="${esc((t.context||[]).join(','))}"></div>
-        <div style="align-self:end"><button class="ghost danger" data-del="${i}">삭제</button></div>
+        <div><label>선행 의존 (쉼표)</label><input data-i="${i}" data-k="dependsOn" value="${esc((t.dependsOn||[]).join(','))}"></div>
+        <div><label>참고 문맥 (쉼표)</label><input data-i="${i}" data-k="context" value="${esc((t.context||[]).join(','))}"></div>
+        <div style="align-self:end"><button class="ghost danger" data-del="${i}" style="width:100%">삭제</button></div>
       </div>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:8px">
-        <div><label>작업 공간</label><input data-i="${i}" data-k="workspace" value="${esc(t.workspace||'none')}" placeholder="none | new | inherit:taskId"></div>
-        <div><label>codex 모델 (선택)</label><input data-i="${i}" data-k="codexModel" value="${esc(t.models?.codex||'')}" placeholder="gpt-5.4-mini"></div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:10px">
+        <div><label>작업 공간 모드</label><input data-i="${i}" data-k="workspace" value="${esc(t.workspace||'none')}" placeholder="none | new | inherit:taskId"></div>
+        <div><label>특정 모델 지정 (선택)</label><input data-i="${i}" data-k="codexModel" value="${esc(t.models?.codex||'')}" placeholder="예: gpt-5.4-mini"></div>
       </div>
-      <div style="margin-top:8px"><label>지시</label><textarea data-i="${i}" data-k="spec" style="min-height:60px">${esc(t.spec)}</textarea></div>
+      <div style="margin-top:10px">
+        <label>수행 지시 (Spec)</label>
+        <textarea data-i="${i}" data-k="spec" style="min-height:65px">${esc(t.spec)}</textarea>
+      </div>
     </div>`).join('');
 
   $('taskList').querySelectorAll('[data-k]').forEach((el) => {
@@ -454,21 +1109,53 @@ function renderTasks() {
     b.onclick = () => { tasks.splice(+b.dataset.del, 1); renderTasks(); };
   });
 }
+
 $('addTask').onclick = () => {
   tasks.push({ id: 'task' + (tasks.length + 1), role: 'custom', spec: '', dependsOn: [], context: [], workspace: 'none' });
   renderTasks();
 };
-$('loadSample').onclick = () => {
-  $('planObjective').value = SAMPLE.objective;
-  tasks = JSON.parse(JSON.stringify(SAMPLE.tasks));
-  renderTasks();
-};
+$('loadSample').onclick = () => { loadPlanTemplate(PLAN_TEMPLATES['readme-sample']); };
 
 const currentPlan = () => ({
   objective: $('planObjective').value || '(목표 없음)',
   ...(Object.keys(routes).length ? { routes } : {}),
   tasks: tasks.map((t) => ({ ...t, models: t.models || undefined })),
 });
+
+/* JSON Import / Export */
+$('btnExportPlanJson').onclick = () => {
+  const jsonStr = JSON.stringify(currentPlan(), null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'conductor-plan.json';
+  a.click();
+};
+
+$('btnImportPlanJson').onclick = () => {
+  $('modalImportJson').hidden = false;
+  $('importJsonText').value = '';
+  $('importJsonText').focus();
+};
+$('btnCancelImport').onclick = () => { $('modalImportJson').hidden = true; };
+$('btnApplyImport').onclick = () => {
+  try {
+    const parsed = JSON.parse($('importJsonText').value);
+    if (!parsed.tasks || !Array.isArray(parsed.tasks)) throw new Error('올바른 tasks 배열이 없습니다.');
+    loadPlanTemplate(parsed);
+    $('modalImportJson').hidden = true;
+  } catch (err) {
+    alert('JSON 파싱 오류: ' + err.message);
+  }
+};
+
+/* 로그 조작 */
+$('btnCopyPlanLog').onclick = () => {
+  navigator.clipboard.writeText($('planOut').textContent);
+  $('btnCopyPlanLog').textContent = '✓ 복사됨!';
+  setTimeout(() => $('btnCopyPlanLog').textContent = '📋 로그 복사', 1500);
+};
+$('btnClearPlanLog').onclick = () => { $('planOut').textContent = ''; };
 
 $('planPreview').onclick = async () => {
   try {
@@ -482,11 +1169,11 @@ $('planPreview').onclick = async () => {
     const issues = data.issues.length
       ? `<div class="bad" style="margin-bottom:8px">${data.issues.map((i) => `· ${esc(i.taskId)}: ${esc(i.message)}`).join('<br>')}</div>` : '';
     $('planPreviewOut').innerHTML = issues + `<table><thead><tr>
-      <th>TASK</th><th>역할</th><th>의존</th><th>작업 공간</th><th>PROVIDER</th><th>대체</th></tr></thead><tbody>
-      ${data.tasks.map((t) => `<tr><td>${esc(t.id)}</td><td>${esc(t.role)}</td>
-        <td class="muted">${esc(t.dependsOn.join(',') || '-')}</td><td class="mono">${esc(t.workspace)}</td>
-        <td>${t.provider ? `<b>${esc(t.provider)}</b>` : '<span class="bad">없음</span>'}</td>
-        <td class="muted">${esc(t.fallbacks.join(',') || '-')}</td></tr>`).join('')}
+      <th>TASK ID</th><th>역할</th><th>의존성</th><th>작업 공간</th><th>배정된 PROVIDER</th><th>페일오버 대체</th></tr></thead><tbody>
+      ${data.tasks.map((t) => `<tr><td><b>${esc(t.id)}</b></td><td><span class="badge badge-muted">${esc(t.role)}</span></td>
+        <td class="muted">${esc(t.dependsOn.join(', ') || '-')}</td><td class="mono">${esc(t.workspace)}</td>
+        <td>${t.provider ? `<b class="ok">${esc(t.provider)}</b>` : '<span class="bad">없음</span>'}</td>
+        <td class="muted">${esc(t.fallbacks.join(' → ') || '-')}</td></tr>`).join('')}
       </tbody></table>`;
   } catch (err) {
     $('planPreviewOut').innerHTML = `<span class="bad">${esc(err.message)}</span>` +
@@ -494,10 +1181,12 @@ $('planPreview').onclick = async () => {
   }
 };
 
-let planRunId = null;
+let planRunId = null, stopPlanTimer = null;
 $('planGo').onclick = async () => {
   $('planOut').textContent = ''; $('planTasks').innerHTML = ''; $('planAsk').innerHTML = '';
   $('planResult').hidden = true; $('planGo').disabled = true; $('planStop').disabled = false;
+  stopPlanTimer = startTimer($('planTimer'));
+
   try {
     const body = { plan: currentPlan(), cwd: $('cwd').value, yolo: $('planYolo').checked };
     if ($('planBudget').value) body.budgetUsd = Number($('planBudget').value);
@@ -511,7 +1200,7 @@ $('planGo').onclick = async () => {
         if (e.type === 'task.start') {
           seen[e.taskId] = document.createElement('div');
           seen[e.taskId].className = 'task run';
-          seen[e.taskId].innerHTML = `<b>${esc(e.taskId)}</b> → ${esc(e.provider)} <span class="muted">실행 중…</span>`;
+          seen[e.taskId].innerHTML = `<b>🚀 ${esc(e.taskId)}</b> → <span class="badge badge-ok">${esc(e.provider)}</span> <span class="muted">실행 중…</span>`;
           $('planTasks').appendChild(seen[e.taskId]);
         }
         if (e.type === 'failover') {
@@ -520,47 +1209,54 @@ $('planGo').onclick = async () => {
         if (e.type === 'task.end' && seen[e.taskId]) {
           const good = e.state === 'succeeded';
           seen[e.taskId].className = 'task ' + (good ? 'ok' : 'bad');
-          seen[e.taskId].innerHTML = `<b>${esc(e.taskId)}</b> <span class="${good ? 'ok' : 'bad'}">${esc(e.state)}</span>` +
-            (e.files ? ` <span class="muted">files ${e.files}</span>` : '') +
-            (e.note ? `<div class="muted" style="font-size:12.5px">${esc(e.note)}</div>` : '');
+          seen[e.taskId].innerHTML = `<b>${good ? '✓' : '✗'} ${esc(e.taskId)}</b> <span class="badge ${good ? 'badge-ok' : 'badge-bad'}">${esc(e.state)}</span>` +
+            (e.files ? ` <span class="muted">파일 ${e.files}개 변경</span>` : '') +
+            (e.note ? `<div class="muted" style="font-size:12.5px;margin-top:4px">${esc(e.note)}</div>` : '');
         }
         if (e.type === 'error') $('planOut').textContent += `\n✗ ${e.message}\n`;
       },
       onDone: (e) => {
         $('planGo').disabled = false; $('planStop').disabled = true;
+        if (stopPlanTimer) { stopPlanTimer(); stopPlanTimer = null; }
         const s = e.summary || {};
         $('planResult').hidden = false;
         $('planResultBody').innerHTML = s.error ? `<span class="bad">${esc(s.error)}</span>` : `
-          <table><thead><tr><th>TASK</th><th>PROVIDER</th><th>상태</th><th>변경</th><th>작업 공간</th></tr></thead><tbody>
-          ${(s.tasks || []).map((t) => `<tr><td>${esc(t.taskId)}</td><td>${esc(t.provider || '-')}</td>
-            <td class="${t.state === 'succeeded' ? 'ok' : 'bad'}">${esc(t.state)}</td>
+          <table><thead><tr><th>TASK ID</th><th>PROVIDER</th><th>최종 상태</th><th>수정 파일</th><th>작업 공간</th></tr></thead><tbody>
+          ${(s.tasks || []).map((t) => `<tr><td><b>${esc(t.taskId)}</b></td><td>${esc(t.provider || '-')}</td>
+            <td><span class="badge ${t.state === 'succeeded' ? 'badge-ok' : 'badge-bad'}">${esc(t.state)}</span></td>
             <td>${t.files.length}</td><td class="mono">${esc(t.workspace || '-')}</td></tr>`).join('')}
           </tbody></table>
           ${(s.tasks || []).some((t) => t.attempts?.length > 1)
-            ? `<div class="hint">재배치: ${(s.tasks || []).filter((t) => t.attempts?.length > 1)
-                .map((t) => `${esc(t.taskId)} ${t.attempts.map((a) => `${a.provider}${a.failoverReason ? `(${a.failoverReason})` : ''}`).join(' → ')}`).join(' / ')}</div>` : ''}
-          ${s.costUsd ? `<div class="hint">비용 $${s.costUsd.toFixed(4)}</div>` : ''}`;
+            ? `<div class="hint">페일오버 기록: ${(s.tasks || []).filter((t) => t.attempts?.length > 1)
+                .map((t) => `${esc(t.taskId)}: ${t.attempts.map((a) => `${a.provider}${a.failoverReason ? `(${a.failoverReason})` : ''}`).join(' → ')}`).join(' / ')}</div>` : ''}
+          ${s.costUsd ? `<div class="hint">누적 소요 비용: <b>$${s.costUsd.toFixed(4)}</b></div>` : ''}`;
         loadStatus(); loadWorkspaces();
       },
     });
   } catch (err) {
     $('planOut').textContent = '✗ ' + err.message;
     $('planGo').disabled = false; $('planStop').disabled = true;
+    if (stopPlanTimer) { stopPlanTimer(); stopPlanTimer = null; }
   }
 };
-$('planStop').onclick = () => api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId: planRunId }) });
+$('planStop').onclick = () => {
+  api('/api/cancel', { method: 'POST', body: JSON.stringify({ runId: planRunId }) });
+  if (stopPlanTimer) { stopPlanTimer(); stopPlanTimer = null; }
+};
 
-/* ── 작업 공간 ──────────────────────────────────────────── */
+/* ── 작업 공간 (Workspaces) ─────────────────────────────── */
 async function loadWorkspaces() {
   try {
     const data = await api('/api/workspaces?cwd=' + encodeURIComponent($('cwd').value));
     $('wsEmpty').hidden = data.workspaces.length > 0;
+    $('statWsCount').textContent = data.workspaces.length;
     $('wsRows').innerHTML = data.workspaces.map((w) => `<tr>
-      <td class="mono">${esc(w.id)}</td><td class="mono muted">${esc(w.branch)}</td>
-      <td>${w.changes.files.length ? `<span class="ok">${w.changes.files.length}</span>` : '<span class="muted">0</span>'}</td>
+      <td class="mono"><b>${esc(w.id)}</b></td>
+      <td class="mono muted">${esc(w.branch)}</td>
+      <td>${w.changes.files.length ? `<span class="badge badge-ok">${w.changes.files.length}개 파일 변경</span>` : '<span class="badge badge-muted">변경 없음</span>'}</td>
       <td class="row" style="gap:6px">
-        <button class="ghost" data-diff="${esc(w.id)}">변경 보기</button>
-        <button class="ghost danger" data-rm="${esc(w.id)}">삭제</button></td></tr>`).join('');
+        <button class="ghost" data-diff="${esc(w.id)}">👁️ Diff 보기</button>
+        <button class="ghost danger" data-rm="${esc(w.id)}">🗑️ 삭제</button></td></tr>`).join('');
 
     $('wsRows').querySelectorAll('[data-diff]').forEach((b) => (b.onclick = () => showDiff(b.dataset.diff)));
     $('wsRows').querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => removeWs(b.dataset.rm, false)));
@@ -568,16 +1264,24 @@ async function loadWorkspaces() {
     $('wsRows').innerHTML = `<tr><td colspan="4" class="bad">${esc(err.message)}</td></tr>`;
   }
 }
+
 async function showDiff(id) {
   const data = await api(`/api/diff?cwd=${encodeURIComponent($('cwd').value)}&id=${encodeURIComponent(id)}`);
   $('wsDiffCard').hidden = false;
-  $('wsDiffTitle').textContent = `${id} — ${data.branch}`;
-  $('wsDiff').innerHTML = (data.diff || '(변경 없음)').split('\n').map((line) => {
+  $('wsDiffTitle').textContent = `변경 내역: ${id} (${data.branch})`;
+  $('wsDiff').innerHTML = (data.diff || '(변경 사항이 없습니다)').split('\n').map((line) => {
     const cls = line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@') ? 'hd'
       : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : '';
     return cls ? `<span class="${cls}">${esc(line)}</span>` : esc(line);
   }).join('\n');
 }
+
+$('btnCopyDiff').onclick = () => {
+  navigator.clipboard.writeText($('wsDiff').textContent);
+  $('btnCopyDiff').textContent = '✓ 복사됨!';
+  setTimeout(() => $('btnCopyDiff').textContent = '📋 Diff 복사', 1500);
+};
+
 async function removeWs(id, force) {
   try {
     await api('/api/workspaces/remove', { method: 'POST', body: JSON.stringify({ cwd: $('cwd').value, id, force }) });
@@ -585,8 +1289,7 @@ async function removeWs(id, force) {
     loadWorkspaces();
   } catch (err) {
     if (err.status === 409) {
-      // 워커의 작업물을 말없이 날리지 않는다. 무엇을 지우는지 보여주고 확인받는다.
-      if (confirm(`커밋되지 않은 변경 ${err.data.files.length}개가 있습니다:\n\n${err.data.files.slice(0, 10).join('\n')}\n\n그래도 삭제할까요?`)) {
+      if (confirm(`커밋되지 않은 변경 ${err.data.files.length}개가 있습니다:\n\n${err.data.files.slice(0, 10).join('\n')}\n\n정말로 이 작업 공간을 삭제할까요?`)) {
         removeWs(id, true);
       }
     } else alert(err.message);
@@ -595,7 +1298,7 @@ async function removeWs(id, force) {
 $('wsRefresh').onclick = loadWorkspaces;
 $('wsDiffClose').onclick = () => ($('wsDiffCard').hidden = true);
 
-/* ── 시작 ───────────────────────────────────────────────── */
+/* ── 초기 실행 ───────────────────────────────────────────── */
 syncRunWarn();
 loadStatus();
 </script>

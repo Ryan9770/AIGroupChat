@@ -1,0 +1,32 @@
+{
+  "objective": "Roguelite RPG(Dungeon of the Abyss) 차세대 기능 업그레이드 (BGM 신시사이저, 상점 NPC, 비밀방/미믹, 유물 시너지)",
+  "routes": {
+    "design": ["codex"],
+    "implement": ["antigravity", "claude"],
+    "review": ["codex", "claude"]
+  },
+  "tasks": [
+    {
+      "id": "feature-spec-design",
+      "role": "design",
+      "spec": "팀장 Codex로서 examples/ROGUELITE_UPGRADE_LIST.md의 1순위 핵심 업그레이드(8-bit 칩튠 BGM 신시사이저, 방랑 상점 NPC 시스템, 비밀방 & 미믹 보물상자 기믹, 유물 2세트 시너지 효과)를 기존 roguelite-game 구조에 무결점 통합하기 위한 상세 테크니컬 스펙과 함수 인터페이스를 설계하라.",
+      "workspace": "none"
+    },
+    {
+      "id": "feature-implementation",
+      "role": "implement",
+      "spec": "워커 Antigravity로서 팀장 Codex의 설계를 바탕으로 roguelite-game(index.html, style.css, game.js)에 신규 기능을 구현하라. 1) Web Audio API 기반 절차적 8-bit BGM 루프 엔진 추가 (소리 토글 연동). 2) 던전 내 방랑 상인 타일 및 상점 모달 UI 연동. 3) 미믹 상자 확률 출현 및 균열 벽 파괴 비밀방 생성. 4) 유물 2세트 시너지 버프 로직 구현. 기존 게임플레이와 테스트가 100% 정상 작동하도록 무결점 코딩하라.",
+      "dependsOn": ["feature-spec-design"],
+      "context": ["feature-spec-design"],
+      "workspace": "none"
+    },
+    {
+      "id": "feature-qa-review",
+      "role": "review",
+      "spec": "팀장 Codex로서 워커 Antigravity가 구현한 업그레이드 기능들이 기획 및 아키텍처에 맞게 결함 없이 구현되었는지 종합 평가하고 최종 완료 보고서를 작성하라.",
+      "dependsOn": ["feature-implementation"],
+      "context": ["feature-spec-design", "feature-implementation"],
+      "workspace": "none"
+    }
+  ]
+}

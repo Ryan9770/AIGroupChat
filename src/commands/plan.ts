@@ -203,8 +203,23 @@ export async function planRun(path: string, opts: PlanRunOptions): Promise<numbe
       observerFor: opts.verbose
         ? () => ({
             onEvent: (event) => {
-              if (event.kind === 'message.delta') process.stdout.write(dim(event.text));
-              else if (event.kind === 'tool.call') process.stdout.write(dim(`\n  ⚙ ${event.name}\n`));
+              if (event.kind === 'message.delta' || event.kind === 'message.final') {
+                process.stdout.write(dim(event.text));
+              } else if (event.kind === 'tool.call') {
+                const detail =
+                  typeof event.input === 'string'
+                    ? event.input
+                    : typeof event.input === 'object' && event.input
+                      ? (event.input as { command?: string; query?: string; path?: string }).command ??
+                        (event.input as { query?: string }).query ??
+                        (event.input as { path?: string }).path ??
+                        ''
+                      : '';
+                const shortDetail = detail ? ` ${cyan(detail.slice(0, 100))}` : '';
+                process.stdout.write(dim(`\n  ⚙ ${event.name}${shortDetail}\n`));
+              } else if (event.kind === 'tool.result' && event.summary) {
+                process.stdout.write(dim(`    ↳ ${event.summary.slice(0, 120)}\n`));
+              }
             },
             onNotice: (text) => process.stdout.write(`  ${yellow(text)}\n`),
           })

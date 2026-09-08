@@ -65,6 +65,8 @@ export interface DispatchRequest {
   observer?: DispatchObserver;
   /** 변경이 없으면 worktree를 정리한다. */
   cleanEmpty?: boolean;
+  /** 팀장(Leader / Design) 역할 여부. AiKA 모드 안내를 주입한다. */
+  isLeader?: boolean;
 }
 
 export interface DispatchResult {
@@ -182,6 +184,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
       workerHandle,
       cli: shim.command,
       canAsk: request.answerMode === 'human',
+      ...(request.isLeader !== undefined ? { isLeader: request.isLeader } : {}),
       ...(drift ? { baseDrift: drift } : {}),
     });
 

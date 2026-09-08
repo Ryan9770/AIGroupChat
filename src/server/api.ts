@@ -232,7 +232,18 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
               if (event.kind === 'message.delta' || event.kind === 'message.final') {
                 emit({ type: 'log', text: event.text });
               } else if (event.kind === 'tool.call') {
-                emit({ type: 'log', text: `\n⚙ ${event.name}\n` });
+                const detail =
+                  typeof event.input === 'string'
+                    ? event.input
+                    : typeof event.input === 'object' && event.input
+                      ? (event.input as { command?: string; query?: string; path?: string }).command ??
+                        (event.input as { query?: string }).query ??
+                        (event.input as { path?: string }).path ??
+                        ''
+                      : '';
+                emit({ type: 'log', text: `\n⚙ ${event.name}${detail ? `: ${detail.slice(0, 100)}` : ''}\n` });
+              } else if (event.kind === 'tool.result' && event.summary) {
+                emit({ type: 'log', text: `  ↳ ${event.summary.slice(0, 120)}\n` });
               } else if (event.kind === 'error') {
                 emit({ type: 'log', text: `\n✗ [${event.code}] ${event.message}\n` });
               } else if (event.kind === 'usage') {
@@ -337,8 +348,22 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
             emit({ type: 'failover', taskId, from, to, reason }),
           observerFor: () => ({
             onEvent: (event) => {
-              if (event.kind === 'message.delta') emit({ type: 'log', text: event.text });
-              else if (event.kind === 'tool.call') emit({ type: 'log', text: `\n⚙ ${event.name}\n` });
+              if (event.kind === 'message.delta' || event.kind === 'message.final') {
+                emit({ type: 'log', text: event.text });
+              } else if (event.kind === 'tool.call') {
+                const detail =
+                  typeof event.input === 'string'
+                    ? event.input
+                    : typeof event.input === 'object' && event.input
+                      ? (event.input as { command?: string; query?: string; path?: string }).command ??
+                        (event.input as { query?: string }).query ??
+                        (event.input as { path?: string }).path ??
+                        ''
+                      : '';
+                emit({ type: 'log', text: `\n⚙ ${event.name}${detail ? `: ${detail.slice(0, 100)}` : ''}\n` });
+              } else if (event.kind === 'tool.result' && event.summary) {
+                emit({ type: 'log', text: `  ↳ ${event.summary.slice(0, 120)}\n` });
+              }
             },
             onNotice: (text) => emit({ type: 'log', text: `\n${text}\n` }),
           }),

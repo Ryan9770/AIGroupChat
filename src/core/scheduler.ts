@@ -183,6 +183,7 @@ export async function runPlan(opts: SchedulerOptions): Promise<TaskOutcome[]> {
       const request: DispatchRequest = {
         provider: candidate.provider,
         spec: task.spec,
+        isLeader: task.role === 'design',
         mode: task.mode ?? (task.role === 'design' || task.role === 'review' ? 'plan' : 'write'),
         cwd: opts.cwd,
         workspace: workspacePlan,

@@ -244,7 +244,7 @@ review     review     implement  inherit:implement  codex        claude,antigrav
 **`inherit:`** — 리뷰어가 구현 결과를 보려면 같은 worktree에 있어야 한다. 별도로 파면
 리뷰어에게 변경이 보이지 않는다. `inherit:X`인데 `dependsOn`에 X가 없으면 실행 전에 거부한다.
 
-### 역할별 담당 정하기 — "Claude 팀장, agy 수행"
+### 역할별 담당 정하기 — 팀장과 수행 모델 선택
 
 누가 무슨 역할을 맡을지 한 번만 정해두면 됩니다. 세 가지 방법이 있고, **아래로 갈수록 우선**합니다.
 
@@ -265,7 +265,7 @@ review     review     implement  inherit:implement  codex        claude,antigrav
 
 **3. Task의 `providers`** — 그 Task에만 적용됩니다.
 
-웹 UI 계획 탭에는 **"Claude 팀장 · agy 수행"** 프리셋 버튼이 있습니다.
+웹 UI 계획 탭에서는 로그인된 provider 중 **팀장(설계·검토)**과 **수행 모델(구현)**을 각각 선택해 팀 구성을 적용할 수 있습니다. 선택되지 않은 provider는 페일오버 후보로 유지됩니다.
 
 > 🔴 **1순위만 적지 마세요.** `"review": ["claude"]`처럼 하나만 두면 claude 쿼터가 차는 순간
 > 그 Task가 실패합니다. 뒤에 대체 후보를 남겨두면 자동으로 넘어갑니다.
@@ -373,6 +373,23 @@ files 1개 변경  · package.json
 | `worker escalate --subject "..." --body "..."` | 완료 전 막힘 보고 |
 | `worker check` | 코디네이터 후속 지시 확인 |
 | `worker heartbeat --phase "..."` | 생존 신호 (진행의 증거는 아님) |
+
+### 팀장(Leader) 에이전트와 AiKA 모드 (토큰 최적화)
+
+고비용 프론티어 모델(Claude 등)이 팀장 역할을 맡았을 때, 수백~수천 줄짜리 대용량 파일을 직접 읽거나 보일러플레이트를 짜느라 비싼 토큰과 5시간 쿼터(Rate Limit)를 낭비하지 않도록, 실측 검증된 경량 워커(**`antigravity`**)에게 작업을 위임하는 **AiKA 선언형 모드**를 지원합니다.
+
+```bash
+# 사용 가능한 선언형 모드 목록 확인
+pnpm dev mode list
+
+# 1. 대용량 파일 분석 및 핵심 요약 추출 (antigravity 워커 위임)
+pnpm dev mode run bulk-reader --files "src/core/*.ts" --query "라우터와 스케줄러 의존성 요약"
+
+# 2. 보일러플레이트/단위 테스트 초안 작성 위임 (antigravity 워커 위임)
+pnpm dev mode run draft-writer --spec "테스트 초안 작성" --context "tests/plan.test.ts"
+```
+
+계획 실행 시 `design` 역할(팀장)을 수행하는 모델에게는 프리앰블을 통해 이 AiKA 모드가 자동으로 안내되어, 팀장이 직접 파일 전체를 읽는 대신 `antigravity` 워커가 요약한 압축 결과만 받아보도록 유도합니다.
 
 ### 완료 판정
 

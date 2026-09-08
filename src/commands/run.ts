@@ -28,6 +28,8 @@ export interface RunCommandOptions {
   protocol: boolean;
   /** 협약 사용 시 질문에 사람이 답할지, 자동 응답할지. */
   answerMode: 'human' | 'auto';
+  /** 팀장(Leader) 모드로 실행. AiKA 모드 위임 가이드라인을 주입한다. */
+  leader?: boolean;
 }
 
 /** 사용률이 이 이상이면 경고를 띄운다. Governor가 재라우팅을 고민해야 할 지점. */
@@ -138,6 +140,7 @@ export async function run(prompt: string, opts: RunCommandOptions): Promise<numb
       attempt: 1,
       cleanEmpty: opts.cleanEmpty,
       signal: controller.signal,
+      ...(opts.leader !== undefined ? { isLeader: opts.leader } : {}),
       ...(runDir ? { runDir } : {}),
       ...(opts.model ? { model: opts.model } : {}),
       ...(opts.resume ? { resumeId: opts.resume } : {}),

@@ -1,0 +1,32 @@
+{
+  "objective": "로그라이트 RPG(Dungeon of the Abyss)의 기획, 스토리 세계관 및 게임 아트 컨셉 대폭 강화",
+  "routes": {
+    "design": ["codex"],
+    "implement": ["antigravity", "claude"],
+    "review": ["codex", "claude"]
+  },
+  "tasks": [
+    {
+      "id": "lore-and-art-design",
+      "role": "design",
+      "spec": "팀장 Codex로서 roguelite-game의 기획, 스토리 세계관, 그리고 게임 아트 컨셉을 총괄 기획하라. 1) 세계관 & 스토리: 고대 심연의 기원, 심연으로 내려가는 3대 영웅(기사, 암살자, 현자)의 동기와 서사, B1F부터 B5F까지 각 계층별 역사적 배경 및 환경 전승, 최종 보스 섀도우 드레이크의 탄생과 타락 서사, 보스 대사 및 층 진입 시 나레이션 텍스트. 2) 게임 기획 고도화: 층별 서사적 퀘스트/비석 상호작용 기믹, 엔딩 분기(노멀/진엔딩) 기획. 3) 아트 & 비주얼 컨셉: 다크 판타지 네오 레트로 픽셀 아트 가이드, 층별 분위기 컬러 무드보드, 몬스터/보스 비주얼 특징 및 모션/파티클 가이드, 고대 양피지 및 룬 문자 UI 프레임 디자인 명세를 구체적으로 작성하라.",
+      "workspace": "none"
+    },
+    {
+      "id": "lore-and-art-implementation",
+      "role": "implement",
+      "spec": "워커 Antigravity로서 팀장 Codex가 수립한 기획, 스토리, 아트 컨셉을 roguelite-game 코드베이스(index.html, style.css, game.js)와 문서(LORE_AND_ART_GUIDE.md)에 완벽히 구현 및 연동하라. 1) 게임 시작 시 세계관 인트로/프롤로그 모달 추가. 2) 각 층 진입 시 서사적 나레이션 배너 연출. 3) B3F 미니보스 데스나이트 및 B5F 섀도우 드레이크 대사 배너 및 2페이즈 연출 강화. 4) 도감(Codex) 내 '심연의 연대기' 탭 추가하여 층별 전승 및 영웅 스토리 열람 가능하게 연동. 5) 캔버스 및 UI에 아트 컨셉(고대 룬/양피지 감성, 층별 특화 파티클 및 엠비언트) 반영.",
+      "dependsOn": ["lore-and-art-design"],
+      "context": ["lore-and-art-design"],
+      "workspace": "none"
+    },
+    {
+      "id": "lore-and-art-review",
+      "role": "review",
+      "spec": "팀장 Codex로서 워커 Antigravity가 구현한 게임 스토리, 아트 컨셉 연동 및 기획 완성도를 검토하라. 세계관 서사가 게임플레이 흐름과 잘 어우러지는지, 비주얼과 분위기가 다크 판타지 레트로 감성에 맞게 고도화되었는지, 코드 및 문서에 결함이 없는지 종합 평가하라.",
+      "dependsOn": ["lore-and-art-implementation"],
+      "context": ["lore-and-art-design", "lore-and-art-implementation"],
+      "workspace": "none"
+    }
+  ]
+}

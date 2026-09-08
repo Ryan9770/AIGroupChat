@@ -12,6 +12,7 @@ import {
   workerEscalate,
   workerHeartbeat,
 } from './commands/worker.js';
+import { modeList, modeRunCli, type ModeRunCliOptions } from './commands/mode.js';
 import { workspaceList, workspaceRemove } from './commands/workspace.js';
 import { isProvider } from './adapters/registry.js';
 import { PROVIDERS } from './protocol/provider.js';
@@ -63,6 +64,11 @@ program
     '도구 승인 프롬프트를 자동 승인한다. agy는 이게 없으면 헤드리스에서 도구가 전부 거부된다',
     false,
   )
+  .option(
+    '--leader',
+    '팀장(Leader) 모드로 실행한다 (AiKA 모드 위임 가이드라인 주입)',
+    false,
+  )
   .action(
     async (
       prompt: string,
@@ -80,6 +86,7 @@ program
         cleanEmpty: boolean;
         protocol: boolean;
         autoAnswer: boolean;
+        leader: boolean;
       },
     ) => {
       if (opts.mode !== 'plan' && opts.mode !== 'write') {
@@ -98,6 +105,7 @@ program
         workspace: opts.workspace,
         cleanEmpty: opts.cleanEmpty,
         protocol: opts.protocol,
+        leader: opts.leader,
         // 파이프로 답을 넣는 경우도 사람 모드로 본다.
         // stdin이 EOF면 Coordinator가 알아서 자동 응답으로 떨어진다.
         answerMode: opts.autoAnswer ? ('auto' as const) : ('human' as const),
@@ -335,6 +343,37 @@ worker
   .option('--dispatch-id <id>')
   .action(async () => {
     process.exitCode = await workerCheck();
+  });
+
+const mode = program
+  .command('mode')
+  .description('AiKA 스타일 선언형 경량 워커 모드(bulk-reader, draft-writer 등)를 실행한다');
+
+mode
+  .command('list', { isDefault: true })
+  .description('등록된 선언형 모드 목록을 확인한다')
+  .action(() => {
+    process.exitCode = modeList();
+  });
+
+mode
+  .command('run')
+  .description('선언형 워커 모드를 실행하여 요약 또는 결과물을 받아온다')
+  .argument('<mode-name>', '실행할 모드 이름 (bulk-reader | draft-writer)')
+  .option('--files <paths>', '분석 대상 파일 경로')
+  .option('--query <text>', '집중 분석 질의')
+  .option('--spec <text>', '작업 명세')
+  .option('--context <text>', '참고 컨텍스트/패턴')
+  .option('--target <text>', '대상 경로')
+  .option('-a, --agent <provider>', 'provider 오버라이드 (기본: antigravity)')
+  .option('--model <model>', '모델 식별자')
+  .option('--cwd <path>', '작업 디렉토리', process.cwd())
+  .option('--timeout <ms>', '타임아웃(ms)', '300000')
+  .option('--json', 'JSON으로 출력한다', false)
+  .option('--no-isolate', '호스트 컨텍스트 격리를 끈다')
+  .option('-y, --yolo', '도구 승인 프롬프트를 자동 승인한다 (antigravity는 기본 자동 승인)', true)
+  .action(async (modeName: string, opts: ModeRunCliOptions) => {
+    process.exitCode = await modeRunCli(modeName, opts);
   });
 
 await program.parseAsync(process.argv);
