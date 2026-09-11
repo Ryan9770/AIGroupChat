@@ -1,0 +1,14 @@
+{
+  "status": "PLAYABLE",
+  "date": "2026-09-10",
+  "gameplay": "PASS",
+  "completedThrough": "research tier 3, three dungeon floors, rotating contract",
+  "realInput": true,
+  "earnedStateInjection": false,
+  "consoleErrors": 0,
+  "notes": [
+    "A full run reached day 9 and completed research tier 3 with earned resources.",
+    "The original full-run runner reported FAIL only because it compared v2 savedAt metadata as an exact raw string after pagehide autosave; v2 state preservation and invalid-save fixtures passed separately.",
+    "Layout and quick J/Space tap regression passed in qa-evidence-v3-layout/layout.json."
+  ]
+}

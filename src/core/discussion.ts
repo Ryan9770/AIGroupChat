@@ -5,6 +5,7 @@ import type { Provider } from '../protocol/provider.js';
 import { runAgent } from '../process/manager.js';
 
 const MAX_TURN_CHARS = 900;
+const MAX_SCRIBE_TURN_CHARS = 4_000;
 const RECENT_CONTEXT_TURNS = 3;
 const MAX_ROLLING_SUMMARY_CHARS = 1_600;
 
@@ -17,6 +18,9 @@ export interface DiscussionTurn {
   role: string;
   text: string;
   error?: string;
+  /** UI text was shortened; the scribe still receives the longer archived text. */
+  truncated?: boolean;
+  originalChars?: number;
 }
 
 export interface DiscussionContribution {
@@ -88,6 +92,17 @@ export function formatTranscript(turns: DiscussionTurn[]): string {
     .join('\n\n');
 }
 
+function buildClosingRoundInstruction(spec: DiscussionSpec, turn: number): string {
+  const firstClosingTurn = Math.max(1, spec.turns - spec.participants.length + 1);
+  if (turn < firstClosingTurn) return '';
+
+  const position = turn - firstClosingTurn + 1;
+  return `최종 입장 라운드 ${position}/${spec.participants.length}:
+- 주제에서 이번 턴에 요구한 분석을 수행한 뒤 반드시 자신의 최종 입장을 남기세요.
+- [최종 선택], [예비 선택], [핵심 근거], [남은 이견], [신뢰도 0~100]을 빠짐없이 적으세요.
+- 새 후보를 만들거나 다른 역할의 표를 대신 추론하지 마세요.`;
+}
+
 export function buildDiscussionTurnPrompt(
   spec: DiscussionSpec,
   participant: DiscussionParticipant,
@@ -113,6 +128,8 @@ ${priorSummary}
 최근 ${RECENT_CONTEXT_TURNS}개 발언:
 ${transcript}
 
+${buildClosingRoundInstruction(spec, turn)}
+
 규칙:
 1. 필요한 경우 현재 프로젝트를 읽고 근거를 확인하되 토론과 관련된 작업만 수행하세요.
 2. 앞선 발언을 단순 반복하지 말고 동의, 반론, 보완 중 자신의 관점을 분명히 하세요.
@@ -121,6 +138,8 @@ ${transcript}
 5. 발언은 800자 이내, 누적 요약은 1,200자 이내의 한국어로 작성하세요.
 6. 반드시 아래 형식만 사용하세요. 누적 요약에는 지금까지의 핵심 주장과 아래 다섯 항목을 보존하세요.
 7. 이전 요약에 있던 후보명, 채택·탈락 이유, 출처와 이견을 임의로 삭제하지 말고 짧게 압축하세요.
+8. 점수를 사용할 때는 평가 기준·가중치·후보별 원점수를 함께 남기고, 근소한 점수 차이는 동률 가능성이 있다고 표시하세요.
+9. 외부 근거가 없는 시장 수치나 성공 기준은 사실처럼 단정하지 말고 반드시 가설로 표시하세요.
 
 <speech>
 이번 차례의 발언
@@ -153,6 +172,13 @@ ${turns.length > 0 ? formatTranscript(turns) : '(발언 없음)'}
 정리 요구사항:
 ${spec.summaryInstructions || DEFAULT_SUMMARY_INSTRUCTIONS}
 
+기록 검증 규칙:
+- 역할별 최종 선택은 해당 역할의 원문 발언에 명시된 경우에만 표로 기록하세요. 누적 요약만으로 누락된 투표를 만들어내지 마세요.
+- 점수 총계는 원문에 평가 기준, 가중치와 원점수가 모두 있을 때만 재현 가능한 점수로 표시하세요.
+- 상위 후보의 차이가 주관적 채점 오차보다 작아 보이면 단독 승자로 과장하지 말고 사실상 동률 또는 민감도 위험을 명시하세요.
+- 출처 없는 판매량, CTR, 시장 규모와 인과 주장은 검증된 시장 근거가 아니라 가설로 분리하세요.
+- 프로토타입, 수직 슬라이스, 출시 범위를 서로 다른 단계로 구분하세요.
+
 반드시 다음을 지키세요:
 - 다수 의견을 사실처럼 단정하지 말고 합의된 내용과 남은 이견을 구분하세요.
 - 근거가 약한 주장과 추가 검증이 필요한 부분을 표시하세요.
@@ -164,11 +190,44 @@ ${spec.summaryInstructions || DEFAULT_SUMMARY_INSTRUCTIONS}
 export function parseDiscussionContribution(raw: string): DiscussionContribution {
   const text = raw.trim();
   const speech = text.match(/<speech>\s*([\s\S]*?)\s*<\/speech>/i)?.[1]?.trim();
-  const rollingSummary = text
-    .match(/<rolling-summary>\s*([\s\S]*?)\s*<\/rolling-summary>/i)?.[1]
-    ?.trim();
+  const rollingSummaryMatch = text.match(
+    /<rolling-summary>\s*([\s\S]*?)\s*<\/rolling-summary>/i,
+  );
+  const rollingSummary = rollingSummaryMatch?.[1]?.trim();
 
-  if (!speech) return { speech: text };
+  if (!speech && rollingSummaryMatch) {
+    const recoveredSpeech = text
+      .replace(rollingSummaryMatch[0], '')
+      .replace(/^\s*<speech>\s*/i, '')
+      .replace(/\s*<\/speech>\s*$/i, '')
+      .trim();
+    return {
+      speech: recoveredSpeech || text,
+      ...(rollingSummary ? { rollingSummary } : {}),
+    };
+  }
+
+  if (!speech) {
+    const summaryStart = text.search(/<rolling-summary>/i);
+    if (summaryStart >= 0) {
+      const recoveredSpeech = text
+        .slice(0, summaryStart)
+        .replace(/^\s*<speech>\s*/i, '')
+        .replace(/\s*<\/speech>\s*$/i, '')
+        .trim();
+      const recoveredSummary = text
+        .slice(summaryStart)
+        .replace(/^<rolling-summary>\s*/i, '')
+        .replace(/\s*<\/rolling-summary>\s*$/i, '')
+        .trim();
+      return {
+        speech: recoveredSpeech || text,
+        ...(recoveredSummary ? { rollingSummary: recoveredSummary } : {}),
+      };
+    }
+
+    return { speech: text };
+  }
   return {
     speech,
     ...(rollingSummary ? { rollingSummary } : {}),
@@ -191,6 +250,7 @@ export async function runDiscussion(options: DiscussionOptions): Promise<Discuss
   };
   const speak = options.speak ?? ((request) => runDiscussionSpeech(request, onAgentEvent));
   const turns: DiscussionTurn[] = [];
+  const scribeTurns: DiscussionTurn[] = [];
   let rollingSummary = '';
 
   for (let index = 0; index < spec.turns; index += 1) {
@@ -201,6 +261,7 @@ export async function runDiscussion(options: DiscussionOptions): Promise<Discuss
     options.onTurnStart?.(number, spec.turns, participant);
 
     let turn: DiscussionTurn;
+    let scribeTurn: DiscussionTurn;
     try {
       const contribution = parseDiscussionContribution(
         await speak({
@@ -212,19 +273,35 @@ export async function runDiscussion(options: DiscussionOptions): Promise<Discuss
           ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
         }),
       );
-      const text = limitTurn(contribution.speech);
-      turn = { number, provider: participant.provider, role: participant.role, text };
+      const fullText = requireSpeech(contribution.speech);
+      const text = limitTurn(fullText);
+      const wasTruncated = fullText.length > MAX_TURN_CHARS;
+      turn = {
+        number,
+        provider: participant.provider,
+        role: participant.role,
+        text,
+        ...(wasTruncated ? { truncated: true, originalChars: fullText.length } : {}),
+      };
+      scribeTurn = {
+        number,
+        provider: participant.provider,
+        role: participant.role,
+        text: limitScribeTurn(fullText),
+      };
       rollingSummary = contribution.rollingSummary
         ? limitRollingSummary(contribution.rollingSummary)
-        : appendFallbackSummary(rollingSummary, turn);
+        : appendFallbackSummary(rollingSummary, scribeTurn);
     } catch (error) {
       if (options.signal?.aborted) throw new DiscussionError('토론이 취소되었습니다');
       const message = error instanceof Error ? error.message : String(error);
       turn = { number, provider: participant.provider, role: participant.role, text: '', error: message };
+      scribeTurn = turn;
       rollingSummary = appendFallbackSummary(rollingSummary, turn);
     }
 
     turns.push(turn);
+    scribeTurns.push(scribeTurn);
     options.onTurnEnd?.(turn);
   }
 
@@ -232,7 +309,7 @@ export async function runDiscussion(options: DiscussionOptions): Promise<Discuss
   options.onSummaryStart?.(spec.scribe.provider);
   const summary = (await speak({
     provider: spec.scribe.provider,
-    prompt: buildDiscussionSummaryPrompt(spec, turns, rollingSummary),
+    prompt: buildDiscussionSummaryPrompt(spec, scribeTurns, rollingSummary),
     cwd: options.cwd,
     ...(spec.scribe.model ? { model: spec.scribe.model } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
@@ -326,19 +403,37 @@ function emptyProviderUsage(): DiscussionProviderUsage {
   };
 }
 
-function limitTurn(text: string): string {
+function requireSpeech(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) throw new DiscussionError('빈 발언을 반환했습니다');
+  return trimmed;
+}
+
+function limitTurn(text: string): string {
+  const trimmed = requireSpeech(text);
   return trimmed.length > MAX_TURN_CHARS
-    ? `${trimmed.slice(0, MAX_TURN_CHARS)}\n…(발언 길이 제한으로 생략)`
+    ? `${trimmed.slice(0, MAX_TURN_CHARS)}\n…(화면 표시 길이 제한으로 생략 · 서기에는 원문 전달)`
+    : trimmed;
+}
+
+function limitScribeTurn(text: string): string {
+  const trimmed = requireSpeech(text);
+  return trimmed.length > MAX_SCRIBE_TURN_CHARS
+    ? `${trimmed.slice(0, MAX_SCRIBE_TURN_CHARS)}\n…(서기 입력 안전 한도로 생략)`
     : trimmed;
 }
 
 function limitRollingSummary(text: string): string {
   const trimmed = text.trim();
-  return trimmed.length > MAX_ROLLING_SUMMARY_CHARS
-    ? `…${trimmed.slice(-MAX_ROLLING_SUMMARY_CHARS)}`
-    : trimmed;
+  if (trimmed.length <= MAX_ROLLING_SUMMARY_CHARS) return trimmed;
+
+  // 후보 레지스트리는 대개 앞쪽에, 최신 결정과 이견은 뒤쪽에 있다.
+  // 한쪽만 자르면 조기 후보 또는 최신 결론 중 하나가 사라지므로 양끝을 보존한다.
+  const separator = '\n…(누적 요약 중간 생략)…\n';
+  const available = MAX_ROLLING_SUMMARY_CHARS - separator.length;
+  const headLength = Math.ceil(available / 2);
+  const tailLength = Math.floor(available / 2);
+  return `${trimmed.slice(0, headLength)}${separator}${trimmed.slice(-tailLength)}`;
 }
 
 function appendFallbackSummary(summary: string, turn: DiscussionTurn): string {

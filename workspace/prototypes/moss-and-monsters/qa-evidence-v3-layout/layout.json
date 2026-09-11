@@ -1,0 +1,109 @@
+{
+  "errors": [],
+  "quickAttackTaps": [
+    "J",
+    "Space"
+  ],
+  "metrics": [
+    {
+      "width": 1440,
+      "height": 900,
+      "scrollWidth": 1440,
+      "canvas": {
+        "x": 80,
+        "y": 111.5,
+        "width": 954,
+        "height": 636,
+        "top": 111.5,
+        "right": 1034,
+        "bottom": 747.5,
+        "left": 80
+      },
+      "survival": {
+        "x": 1055,
+        "y": 71,
+        "width": 302,
+        "height": 435.78125,
+        "top": 71,
+        "right": 1357,
+        "bottom": 506.78125,
+        "left": 1055
+      }
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "scrollWidth": 1280,
+      "canvas": {
+        "x": 135,
+        "y": 111.5,
+        "width": 684,
+        "height": 456,
+        "top": 111.5,
+        "right": 819,
+        "bottom": 567.5,
+        "left": 135
+      },
+      "survival": {
+        "x": 840,
+        "y": 71,
+        "width": 302,
+        "height": 435.78125,
+        "top": 71,
+        "right": 1142,
+        "bottom": 506.78125,
+        "left": 840
+      }
+    },
+    {
+      "width": 760,
+      "height": 900,
+      "scrollWidth": 760,
+      "canvas": {
+        "x": 13,
+        "y": 102,
+        "width": 734,
+        "height": 489.328125,
+        "top": 102,
+        "right": 747,
+        "bottom": 591.328125,
+        "left": 13
+      },
+      "survival": {
+        "x": 10,
+        "y": 696.328125,
+        "width": 364,
+        "height": 419.78125,
+        "top": 696.328125,
+        "right": 374,
+        "bottom": 1116.109375,
+        "left": 10
+      }
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "canvas": {
+        "x": 13,
+        "y": 102,
+        "width": 364,
+        "height": 242.65625,
+        "top": 102,
+        "right": 377,
+        "bottom": 344.65625,
+        "left": 13
+      },
+      "survival": {
+        "x": 10,
+        "y": 447.65625,
+        "width": 370,
+        "height": 419.78125,
+        "top": 447.65625,
+        "right": 380,
+        "bottom": 867.4375,
+        "left": 10
+      }
+    }
+  ]
+}

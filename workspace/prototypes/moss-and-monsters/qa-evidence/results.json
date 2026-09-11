@@ -1,0 +1,140 @@
+{
+  "status": "PLAYABLE",
+  "acceleratedTime": false,
+  "stateMutations": false,
+  "wallSeconds": 79,
+  "sourceSHA256": "2c86358203c49dea73f28d2c250667c5a0d2dbb871e8db73e6c7f71a64c1d7f3",
+  "results": [
+    {
+      "name": "Load and title",
+      "details": "",
+      "seconds": 1
+    },
+    {
+      "name": "Keyboard movement",
+      "details": "",
+      "seconds": 1
+    },
+    {
+      "name": "First harvest",
+      "details": "2 seconds",
+      "seconds": 3
+    },
+    {
+      "name": "Slime recruited and carrot consumed",
+      "details": "",
+      "seconds": 5
+    },
+    {
+      "name": "Six carrot seeds planted",
+      "details": "",
+      "seconds": 10
+    },
+    {
+      "name": "Bridge blocked with farm role",
+      "details": "",
+      "seconds": 12
+    },
+    {
+      "name": "Companion opens bridge",
+      "details": "",
+      "seconds": 13
+    },
+    {
+      "name": "Normal-time crop growth and six harvests",
+      "details": "",
+      "seconds": 20
+    },
+    {
+      "name": "Mole recruited across river",
+      "details": "",
+      "seconds": 24
+    },
+    {
+      "name": "Rock gate blocked without companion",
+      "details": "",
+      "seconds": 26
+    },
+    {
+      "name": "Mole opens rock gate",
+      "details": "",
+      "seconds": 26
+    },
+    {
+      "name": "All three friends recruited",
+      "details": "",
+      "seconds": 28
+    },
+    {
+      "name": "Lantern requires moth companion",
+      "details": "",
+      "seconds": 28
+    },
+    {
+      "name": "Moth discovers moonflower seed",
+      "details": "",
+      "seconds": 28
+    },
+    {
+      "name": "Role choice pauses moonflower growth",
+      "details": "",
+      "seconds": 37
+    },
+    {
+      "name": "Moonflower harvest benefits from mole +1 yield",
+      "details": "",
+      "seconds": 48
+    },
+    {
+      "name": "Tree restoration victory reached through real input",
+      "details": "53 game seconds",
+      "seconds": 54
+    },
+    {
+      "name": "Post-victory continued play",
+      "details": "",
+      "seconds": 54
+    },
+    {
+      "name": "Restart cancel preserves progress",
+      "details": "",
+      "seconds": 54
+    },
+    {
+      "name": "Restart resets progression",
+      "details": "",
+      "seconds": 55
+    },
+    {
+      "name": "Second run remains playable",
+      "details": "",
+      "seconds": 56
+    },
+    {
+      "name": "Compact desktop has no horizontal overflow",
+      "details": "",
+      "seconds": 56
+    },
+    {
+      "name": "Keyboard E harvest on a fresh page",
+      "details": "",
+      "seconds": 58
+    },
+    {
+      "name": "Alternate path allows moth recruitment before mole",
+      "details": "",
+      "seconds": 79
+    },
+    {
+      "name": "Only one companion can be active",
+      "details": "",
+      "seconds": 79
+    },
+    {
+      "name": "Zero browser console and page errors",
+      "details": "",
+      "seconds": 79
+    }
+  ],
+  "errors": []
+}

@@ -11,7 +11,16 @@ import type { PendingQuestion } from '../orchestration/coordinator.js';
 export type UiEvent =
   | { type: 'log'; text: string }
   | { type: 'discussion.turn.start'; turn: number; totalTurns: number; provider: string; role: string }
-  | { type: 'discussion.turn.end'; turn: number; provider: string; role: string; text: string; error?: string }
+  | {
+      type: 'discussion.turn.end';
+      turn: number;
+      provider: string;
+      role: string;
+      text: string;
+      error?: string;
+      truncated?: boolean;
+      originalChars?: number;
+    }
   | { type: 'discussion.summary.start'; provider: string }
   | { type: 'discussion.summary.end'; provider: string; text: string }
   | { type: 'task.start'; taskId: string; provider: string; reason: string }

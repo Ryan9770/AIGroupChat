@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>이끼섬의 친구들 · Moss & Monsters</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<main class="app">
+  <header class="masthead"><a class="wordmark" href="./"><span class="brand-icon">✳</span><span>이끼섬의 친구들<small>MOSS & MONSTERS</small></span></a><div class="edition"><span class="status-dot"></span> PLAYABLE FIELD NOTES <span class="version">01 / PROTOTYPE</span></div></header>
+  <section class="intro"><div><p class="eyebrow">A SMALL ISLAND. A LITTLE FRIENDSHIP.</p><h1>한 알을 심고,<br>새로운 친구를 만나요.</h1></div><p class="intro-copy">수확한 작물로 마음을 얻고, 친구의 힘으로 길을 열어요.<br>잠든 고목에 다시 꽃을 피우는 작은 섬 생활.</p></section>
+  <div class="game-layout">
+    <section class="field-panel" aria-label="게임 화면">
+      <div class="field-top"><span><i class="status-dot"></i> 이끼섬 <span class="muted">/ 초록의 계절</span></span><span id="day">DAY 01 · 08:00</span></div>
+      <div class="canvas-wrap"><canvas id="world" width="720" height="480" tabindex="0" aria-label="이끼섬 탐험. WASD 또는 방향키로 이동, E로 상호작용. 지도를 클릭하면 이동합니다."></canvas><div id="location" class="location">씨앗 정원</div><div id="toast" class="toast" role="status" aria-live="polite"></div><div id="prompt" class="interaction-prompt"></div>
+        <div id="start-screen" class="screen"><div class="start-card"><span class="eyebrow">WELCOME TO YOUR ISLAND</span><h2>모든 우정은<br>작은 씨앗에서.</h2><p>당근을 키워 세 친구를 만나세요.<br>함께 길을 열고, 달빛꽃으로 고목을 깨워요.</p><button id="start" class="primary">섬에 첫발 내딛기 <span>↗</span></button><small>WASD 이동 · E 상호작용 · 클릭으로도 플레이</small></div></div>
+        <div id="win-screen" class="screen hidden"><div class="start-card"><span class="eyebrow">AN ISLAND IN BLOOM</span><h2>우리가 키운 건,<br>함께하는 내일.</h2><p id="win-summary"></p><button id="continue" class="primary">섬에서 더 머무르기 <span>↗</span></button></div></div>
+      </div>
+      <div class="field-bottom"><div><kbd>W A S D</kbd> 이동 <kbd>E</kbd> 심기 · 수확 · 교감</div><span>지도를 클릭하면 이동 · 대상을 클릭하면 상호작용</span></div>
+      <div class="bag"><span class="section-label">주머니</span><div class="resource"><span class="carrot-icon">◆</span> 당근 <strong id="roots">0</strong></div><div class="resource"><span class="flower-icon">✿</span> 달빛꽃 <strong id="flowers">0</strong></div><div class="resource level"><span>✧</span> 농사 <strong id="level">Lv.1</strong><span id="xp">0 / 4</span></div></div>
+    </section>
+    <aside class="sidebar">
+      <section class="goal-card"><div class="card-heading"><span class="section-label">오늘의 작은 모험</span><span id="progress">01 / 06</span></div><h2 id="goal-title">첫 당근을 수확해요</h2><p id="goal-body">밭의 주황색 당근 곁으로 가서 E를 눌러요. 빈 밭에는 무료 씨앗을 심을 수 있어요.</p><div class="progress-track"><div id="progress-bar"></div></div></section>
+      <section class="seeds-card"><div class="card-heading"><span class="section-label">심을 씨앗</span><span class="muted">무제한</span></div><div class="seed-options"><button id="seed-root" class="seed active" aria-pressed="true"><span>◆</span> 당근<small>기본 12초</small></button><button id="seed-flower" class="seed" aria-pressed="false" disabled><span>✿</span> 달빛꽃<small>숲에서 발견</small></button></div><p id="farm-buff" class="tiny">친구가 밭에 머물면 농사가 달라져요.</p></section>
+      <section class="friends-card"><div class="card-heading"><span class="section-label">섬의 친구들</span><span id="friend-count">0 / 3</span></div><div id="roster"></div><p class="tiny">한 친구는 한 역할만 맡아요. 동행은 1마리,<br>농장에는 여러 친구가 함께할 수 있어요.</p></section>
+      <div class="note"><span>✎</span><p>급할 것 없어요.<br>섬에는 실패도, 시드는 작물도 없으니까요.</p></div>
+    </aside>
+  </div>
+  <footer><span>이번 버전은 저장되지 않아요. 새로고침하면 처음부터 시작해요.</span><div><button id="sound" class="text-button" aria-pressed="false">소리 꺼짐</button><button id="restart" class="text-button">처음부터</button></div></footer>
+</main><script src="game.js"></script></body></html>

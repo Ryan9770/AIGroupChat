@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Home interior and keyboard movement",
+    "detail": "",
+    "seconds": 1
+  },
+  {
+    "name": "Finite seeds consumed and crops do not grow in real time",
+    "detail": "",
+    "seconds": 12
+  },
+  {
+    "name": "Overnight maturity and planting rejected at zero seeds",
+    "detail": "",
+    "seconds": 25
+  },
+  {
+    "name": "Carrot converted to two finite seeds",
+    "detail": "",
+    "seconds": 26
+  },
+  {
+    "name": "Three monster friends and moonflower seed discovery",
+    "detail": "",
+    "seconds": 33
+  },
+  {
+    "name": "Flower harvest returns seed and supports both tree and research",
+    "detail": "",
+    "seconds": 54
+  },
+  {
+    "name": "Both facilities lead onward to research instead of ending progression",
+    "detail": "",
+    "seconds": 146
+  },
+  {
+    "name": "Optional carrot bond training costs resources and is daily limited",
+    "detail": "",
+    "seconds": 167
+  }
+]

@@ -1,0 +1,160 @@
+{
+  "status": "PLAYABLE",
+  "acceleratedTime": false,
+  "gameStateMutations": false,
+  "malformedSaveFixtureInjection": "Three separate browser contexts, only after earned normal-input completion",
+  "wallSeconds": 113,
+  "hashes": {
+    "game.js": "74b25ce63bd9f684cc53051a5115ab987eb819b0bf73ebda7f689dedab8a211f",
+    "index.html": "451427e6b44739876031dd277759f6466a9f4dd85001817da6ac5102604031d6",
+    "style.css": "f5041ab31d71585a4f1ba84afd88ebac84fe41da631274c89dba58becef6a553"
+  },
+  "results": [
+    {
+      "name": "Fresh day 1 loads with eight plots",
+      "details": "",
+      "seconds": 1
+    },
+    {
+      "name": "Keyboard movement and E harvest",
+      "details": "",
+      "seconds": 3
+    },
+    {
+      "name": "Herb and wood yield once per node per day",
+      "details": "",
+      "seconds": 7
+    },
+    {
+      "name": "Insufficient cooking resources leave inventory unchanged",
+      "details": "",
+      "seconds": 9
+    },
+    {
+      "name": "Carrot planting, normal-time growth, harvest and slime bridge",
+      "details": "",
+      "seconds": 27
+    },
+    {
+      "name": "Three recruits, ability gates and repeatable companion forage bonuses",
+      "details": "",
+      "seconds": 52
+    },
+    {
+      "name": "Farm mole doubles eight-plot harvest to sixteen carrots",
+      "details": "",
+      "seconds": 68
+    },
+    {
+      "name": "Soup recipe consumes two carrots and one herb",
+      "details": "",
+      "seconds": 70
+    },
+    {
+      "name": "Orders pay 12G and stop at two per day",
+      "details": "",
+      "seconds": 73
+    },
+    {
+      "name": "Raw carrot sale remains available after order cap",
+      "details": "",
+      "seconds": 73
+    },
+    {
+      "name": "24G and three wood expand garden from eight to twelve plots",
+      "details": "",
+      "seconds": 73
+    },
+    {
+      "name": "Unaffordable upgrade does not consume resources",
+      "details": "",
+      "seconds": 74
+    },
+    {
+      "name": "Moth role switches pause and resume moonflower growth",
+      "details": "",
+      "seconds": 77
+    },
+    {
+      "name": "30G and four wood upgrade kitchen and display 18G orders",
+      "details": "",
+      "seconds": 87
+    },
+    {
+      "name": "Final milestone earned on day 1 with no forced date gate",
+      "details": "96 game seconds",
+      "seconds": 97
+    },
+    {
+      "name": "Completed settlement remains playable",
+      "details": "",
+      "seconds": 97
+    },
+    {
+      "name": "Cottage opens daily harvest, forage, cooking, income and spending summary",
+      "details": "",
+      "seconds": 104
+    },
+    {
+      "name": "Sleep advances day, resets orders and matures planted crop",
+      "details": "",
+      "seconds": 104
+    },
+    {
+      "name": "Next-day forage returns and companion bonuses apply again",
+      "details": "",
+      "seconds": 108
+    },
+    {
+      "name": "New-day kitchen order pays 18G",
+      "details": "",
+      "seconds": 111
+    },
+    {
+      "name": "Save and reload preserve resources, both upgrades, day, plots and monsters",
+      "details": "",
+      "seconds": 111
+    },
+    {
+      "name": "1440x900 and 1024x768 desktop layouts have no horizontal overflow",
+      "details": "",
+      "seconds": 111
+    },
+    {
+      "name": "Restart cancel preserves current settlement",
+      "details": "",
+      "seconds": 111
+    },
+    {
+      "name": "Restart confirm resets progression and removes saved settlement",
+      "details": "",
+      "seconds": 111
+    },
+    {
+      "name": "New game after restart can harvest again",
+      "details": "",
+      "seconds": 113
+    },
+    {
+      "name": "Malformed-save fixture safely falls back: malformed-json",
+      "details": "",
+      "seconds": 113
+    },
+    {
+      "name": "Malformed-save fixture safely falls back: invalid-negative-coins",
+      "details": "",
+      "seconds": 113
+    },
+    {
+      "name": "Malformed-save fixture safely falls back: unsupported-save-version",
+      "details": "",
+      "seconds": 113
+    },
+    {
+      "name": "Zero browser console and JavaScript errors",
+      "details": "",
+      "seconds": 113
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>키네틱 절개 탈출 (Kinetic Breach Runner / 절개항해)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Visual Overlays -->
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+    <div id="alarm-flash"></div>
+
+    <!-- Notification Banner -->
+    <div id="notification-banner">알림 메시지</div>
+
+    <!-- Debug Panel (F3) -->
+    <div id="debug-panel"></div>
+
+    <!-- HUD Overlay -->
+    <div id="hud-overlay">
+      <!-- Top HUD Cards -->
+      <div class="hud-top">
+        <!-- Pressure System Gauge -->
+        <div class="hud-card pressure-container">
+          <div class="pressure-header">
+            <div>
+              <div class="card-title">구역 내 압력 (CHAMBER PRESSURE)</div>
+              <div class="pressure-value" id="hud-pressure-val">0%</div>
+            </div>
+            <div id="hud-pressure-tag" class="pressure-status-tag safe">SAFE</div>
+          </div>
+          <div class="gauge-bar-bg">
+            <div id="hud-pressure-fill" class="gauge-bar-fill safe"></div>
+          </div>
+          <div class="leak-rate-indicator">
+            <span id="hud-leak-rate">누출 전파율: +0.0%/s</span>
+            <span id="hud-collapse-alert" style="color: #ef4444; font-weight: bold; display: none;">붕괴 경보!</span>
+          </div>
+        </div>
+
+        <!-- Suit Hull Integrity & Sealants -->
+        <div class="hud-card suit-status">
+          <div class="stat-item">
+            <div class="card-title">슈트 내구도 (HULL)</div>
+            <div class="stat-val" id="hud-hp-val">100 / 100</div>
+            <div class="hp-bar-bg">
+              <div id="hud-hp-fill" class="hp-bar-fill"></div>
+            </div>
+          </div>
+          <div class="stat-item">
+            <div class="card-title">나노 봉합재 (SEAL)</div>
+            <div class="stat-val" style="color: #38bdf8;" id="hud-sealants-val">5</div>
+          </div>
+        </div>
+
+        <!-- Sector & Specimen Research Info -->
+        <div class="hud-card hud-sector-card">
+          <div class="card-title">현재 탐사 구역</div>
+          <div class="sector-name" id="hud-sector-name">제1구역: 저압 침투 시험장</div>
+          <div class="specimen-counter">
+            소지 표본: <span id="hud-specimens-val" style="color: #fde047; font-weight: bold;">0</span>개 | 
+            영구 사출: <span id="hud-banked-val" style="color: #4ade80; font-weight: bold;">0</span>개
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom HUD Navigation & Help -->
+      <div class="hud-bottom">
+        <div class="controls-hint">
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 추력 이동 | <kbd>마우스 조준</kbd></div>
+          <div><kbd>좌클릭</kbd> or <kbd>Space</kbd> <strong>절개 및 반동 추진 (Kinetic Breach)</strong></div>
+          <div><kbd>우클릭</kbd> or <kbd>Shift</kbd> <strong>나노 봉합 (Nanite Seal)</strong></div>
+          <div><kbd>E</kbd> 감압실 콘솔 사출·강화 | <kbd>F3</kbd> 기술 진단</div>
+        </div>
+
+        <div class="hud-buttons">
+          <button class="btn-hud" id="btn-mute">소리: ON</button>
+          <button class="btn-hud" id="btn-help">조작 및 기획 가이드</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 1: Airlock & Decompression Chamber Console -->
+    <div id="modal-airlock" class="modal-overlay">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div class="modal-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 3v18M15 3v18"/>
+            </svg>
+            감압실 에어락 제어 콘솔 (DECOMPRESSION AIRLOCK)
+          </div>
+        </div>
+        <div class="modal-body">
+          <p>안전 감압 격벽 내부에 도달했습니다. 확보한 외계 코어 표본을 안전하게 위성 기지로 사출하고 슈트 시스템을 업그레이드하십시오.</p>
+          
+          <div style="background: #08101a; border: 1px solid #1f334d; border-radius: 6px; padding: 12px; margin: 12px 0;">
+            <div>현재 소지 중인 미사출 표본: <strong id="airlock-carried-count" style="color: #fde047;">0</strong>개</div>
+            <div>영구 보존된 표본 자원: <strong id="airlock-banked-count" style="color: #4ade80;">0</strong>개</div>
+            <div style="margin-top: 8px;">
+              <button class="btn-primary" id="btn-airlock-bank" style="padding: 8px 16px; font-size: 12px;">
+                🚀 소지 표본 즉시 사출 (100% 영구 보존 + 봉합재·체력 회복)
+              </button>
+            </div>
+          </div>
+
+          <h3 style="margin-top: 14px; font-size: 13px; color: #38bdf8;">연구 표본 소비: 횡적 슈트 강화 모듈</h3>
+          <div class="upgrade-list">
+            <div class="upgrade-card" data-upgrade="vectorThruster" data-cost="2">
+              <div class="upgrade-info">
+                <h4>충격 벡터 추진기 (Vector Thruster)</h4>
+                <p>절개 시 발생하는 물리 반동 추진력을 +35% 강화하여 급속 탈출 및 고속 기동을 지원합니다.</p>
+              </div>
+              <div class="upgrade-cost">비용: 표본 2개</div>
+            </div>
+
+            <div class="upgrade-card" data-upgrade="rapidNanite" data-cost="2">
+              <div class="upgrade-info">
+                <h4>광역 급속 나노 분사기 (Rapid Nanite Nozzle)</h4>
+                <p>봉합 사거리를 +50% 증가시키며, 봉합 성공 시 구역 내 압력을 즉각 5% 추가 감소시킵니다.</p>
+              </div>
+              <div class="upgrade-cost">비용: 표본 2개</div>
+            </div>
+
+            <div class="upgrade-card" data-upgrade="overchargedBlade" data-cost="3">
+              <div class="upgrade-info">
+                <h4>고주파 플라즈마 블레이드 (Overcharged Blade)</h4>
+                <p>절개 도달 범위를 +40% 확장하여 더 먼 거리의 취약벽과 스위치를 절개합니다.</p>
+              </div>
+              <div class="upgrade-cost">비용: 표본 3개</div>
+            </div>
+
+            <div class="upgrade-card" data-upgrade="pressureSuit" data-cost="3">
+              <div class="upgrade-info">
+                <h4>가압 완충 차폐복 (Pressure Hull Dampener)</h4>
+                <p>고압 가스 제트 및 풍압 피해를 50% 흡수하고 최대 슈트 내구도를 +25 확장합니다.</p>
+              </div>
+              <div class="upgrade-cost">비용: 표본 3개</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="btn-airlock-extract">귀환 성공 (런 정산 및 탈출)</button>
+          <button class="btn-primary" id="btn-airlock-next">다음 심도 구역 진입 (Dive Deeper) →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: Help / Concept Guide -->
+    <div id="modal-help" class="modal-overlay">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div class="modal-title">키네틱 절개 탈출 — 시스템 가이드</div>
+        </div>
+        <div class="modal-body">
+          <h3 style="color: #19d4d6; margin-bottom: 8px;">핵심 철학: 행동과 대가 (Risk & Reward)</h3>
+          <p>플레이어는 고압 폐쇄 구역에서 물리 법칙을 도구로 사용하는 기술 탐험가입니다. 벽을 부수는 것이 아니라 <strong>필요한 만큼 절개하고</strong>, 발생한 압력을 <strong>추진력으로 활용</strong>하며, 감당할 수 없는 누출은 <strong>봉합</strong>합니다.</p>
+          
+          <h4 style="color: #f59e0b; margin-top: 14px; margin-bottom: 6px;">30초 코어 루프</h4>
+          <ol style="padding-left: 20px; line-height: 1.8;">
+            <li><strong>벽면 식별:</strong> 청록색 균열벽(절개 가능), 주황색 결정벽(절개 가능/봉합 불가)을 읽습니다.</li>
+            <li><strong>절개 및 반동:</strong> <kbd>좌클릭</kbd>으로 절개하면 벽이 파단되며 <strong>조준 반대 방향으로 강력한 키네틱 반동 추진</strong>이 발생합니다!</li>
+            <li><strong>누출 관리:</strong> 절개 구멍에서 고압 가스 제트가 분출되어 방 압력이 지속 상승합니다. <kbd>우클릭</kbd>으로 봉합재를 분사해 차단하십시오.</li>
+            <li><strong>자율적 정산:</strong> 감압실에 도달하여 확보한 표본을 안전 사출하거나 추가 탐사를 결정합니다.</li>
+          </ol>
+
+          <h4 style="color: #ef4444; margin-top: 14px; margin-bottom: 6px;">압력 4단계</h4>
+          <ul style="padding-left: 20px; line-height: 1.8;">
+            <li><span style="color: #19d4d6;">안정 (0~39%):</span> 정상 시야 및 미풍.</li>
+            <li><span style="color: #f59e0b;">경고 (40~74%):</span> 공기 난기류 발생, 반응로 웅웅거림 심화.</li>
+            <li><span style="color: #ef4444;">위기 (75~99%):</span> 붉은 경보 플래시, 사이렌 펄스 발생.</li>
+            <li><span style="color: #ff0055; font-weight: bold;">붕괴 (100%):</span> 10초 내 압력을 낮추지 못하면 격벽 대붕괴로 즉사!</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="btn-close-help">이해했습니다 (닫기)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: Game Over -->
+    <div id="modal-gameover" class="modal-overlay">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div class="modal-title" style="color: #ef4444;">탐사 실패 (MISSION FAILED)</div>
+        </div>
+        <div class="modal-body">
+          <p id="death-cause" style="color: #fca5a5; font-weight: bold; margin-bottom: 12px;"></p>
+          <p>미사출 상태였던 표본 자원이 소실되었습니다. 감압실에서 영구 사출하지 않은 자원은 구역 붕괴 시 회수할 수 없습니다.</p>
+          <div id="gameover-stats" style="margin-top: 14px; background: #161e2e; padding: 12px; border-radius: 4px; font-size: 12px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="btn-restart">새로운 탐사 시작</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: Victory / Run Clear -->
+    <div id="modal-victory" class="modal-overlay">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div class="modal-title" style="color: #4ade80;">탐사 성공 및 정산 완료 (EXPEDITION EXTRACTED)</div>
+        </div>
+        <div class="modal-body">
+          <p style="color: #bbf7d0; font-weight: bold; margin-bottom: 12px;">모든 고압 폐쇄 구역을 성공적으로 탐사하고 귀환선으로 귀환했습니다!</p>
+          <p>자신이 만든 고압 누출을 통제하고 물리 반동을 도구 삼아 심층 구역의 외계 코어 표본을 전량 확보했습니다.</p>
+          <div id="victory-stats" style="margin-top: 14px; background: #064e3b; border: 1px solid #10b981; padding: 12px; border-radius: 4px; font-size: 12px; color: #ecfdf5;"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="btn-victory-restart">새로운 도전 시작</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

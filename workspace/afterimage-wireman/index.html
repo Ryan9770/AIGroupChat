@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>잔상 배선공 (Afterimage Wireman: 6-Second Time Heist)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Visual Overlays -->
+    <div class="scanlines"></div>
+    <div id="alarm-overlay"></div>
+    <div id="status-banner">알림</div>
+
+    <!-- F3 Diagnostics -->
+    <div id="f3-panel"></div>
+
+    <!-- HUD Overlay -->
+    <div id="hud-overlay">
+      <!-- Top HUD -->
+      <div class="hud-top">
+        <!-- Loop Timer -->
+        <div class="hud-card loop-timer-card">
+          <div class="timer-header">
+            <div>
+              <div class="card-title">하이스트 루프 타이머 (6.0s LOOP)</div>
+              <div class="timer-val" id="timer-val">6.00s</div>
+            </div>
+            <div class="loop-badge" id="loop-badge">루프 1 / 3</div>
+          </div>
+          <div class="timer-bar-bg">
+            <div class="timer-bar-fill" id="timer-fill"></div>
+          </div>
+        </div>
+
+        <!-- Tracks Status -->
+        <div class="hud-card tracks-card">
+          <div class="card-title" style="margin-bottom: 0;">타임라인 트랙:</div>
+          <div class="track-item ghost-1" id="track-0">
+            <div class="track-dot"></div>
+            <span>잔상 1 (호박색)</span>
+          </div>
+          <div class="track-item ghost-2" id="track-1">
+            <div class="track-dot"></div>
+            <span>잔상 2 (녹색)</span>
+          </div>
+          <div class="track-item live active" id="track-live">
+            <div class="track-dot"></div>
+            <span>라이브 플레이어 (시안)</span>
+          </div>
+        </div>
+
+        <!-- Room Objective -->
+        <div class="hud-card room-info-card">
+          <div class="card-title">작전 구역 (OPERATION ZONE)</div>
+          <div class="room-name" id="room-name">제1구역: 격벽 협업</div>
+          <div class="room-desc" id="room-desc">상단 제어 스위치를 잔상으로 누르고 있는 동안 탈출하십시오.</div>
+        </div>
+      </div>
+
+      <!-- Bottom Controls -->
+      <div class="hud-bottom">
+        <div class="controls-hint">
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 | <kbd>E</kbd> <strong>상호작용 (줍기/놓기/반응로 삽입)</strong></div>
+          <div><kbd>Space</kbd> or <kbd>Enter</kbd> <strong>현재 루프 조기 확정 & 다음 잔상 침투 시작 (6초 대기 불필요)</strong></div>
+          <div><kbd>R</kbd> 즉각 재시도 | <kbd>1</kbd>~<kbd>5</kbd> 구역 선택 | <kbd>P</kbd> 일시정지 & <kbd>[</kbd><kbd>]</kbd> 스크러빙</div>
+        </div>
+
+        <div class="hud-buttons">
+          <button class="btn-hud" id="btn-retry">룸 재시도 (R)</button>
+          <button class="btn-hud" id="btn-mute">소리: ON</button>
+          <button class="btn-hud" id="btn-help">작전 규칙 가이드</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="modal-help" class="modal-overlay">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div class="modal-title">잔상 배선공 — 6초 시간 하이스트 가이드</div>
+        </div>
+        <div class="modal-body">
+          <h3 style="color: #00e5ff; margin-bottom: 8px;">핵심 판타지: "과거의 내가 다음 시도의 도구가 된다."</h3>
+          <p>플레이어는 6.0초(360 고정 틱)의 루프 속에서 자신의 이동과 <kbd>E</kbd> 상호작용을 기록하고, 다음 루프에서 재생되는 과거 잔상과 실시간 협동하여 보안 시설을 돌파합니다.</p>
+
+          <h4 style="color: #ffb300; margin-top: 14px; margin-bottom: 6px;">4대 하이스트 전술</h4>
+          <ol style="padding-left: 20px; line-height: 1.8;">
+            <li><strong>동기화 (Synchronize):</strong> 잔상이 제어 단말기 위에 서 있는 동안 개방된 방폭 격벽을 질주 돌파합니다.</li>
+            <li><strong>전달 (Relay):</strong> 잔상이 금고에서 에너지 셀을 꺼내 중앙 인계 지점에 투하(<kbd>E</kbd>)하면, 라이브 플레이어가 이를 가로채 반응로에 꽂습니다.</li>
+            <li><strong>유인 (Lure):</strong> 잔상이 기만 콘솔을 조작해 보안 레이저를 일시 무력화하는 사이, 코어를 탈취합니다.</li>
+            <li><strong>조기 확정 (Early Commit):</strong> 자기 몫의 행동을 마쳤다면 6초를 기다리지 않고 <kbd>Space</kbd>를 눌러 즉시 다음 침투를 시작하십시오!</li>
+          </ol>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="btn-close-help">작전 개시 (닫기)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="modal-victory" class="modal-overlay">
+      <div class="modal-window">
+        <div class="modal-header">
+          <div class="modal-title" style="color: #00e676;">★ 하이스트 성공 (HEIST COMPLETED)</div>
+        </div>
+        <div class="modal-body">
+          <p style="color: #64ffda; font-weight: bold; font-size: 14px; margin-bottom: 12px;">보안 구역을 성공적으로 돌파하고 탈출구에 도달했습니다!</p>
+          <div style="background: #21262d; padding: 14px; border-radius: 6px; margin: 12px 0;">
+            <div>클리어 소요 시간: <strong id="victory-time" style="color: #00e5ff;">0.00초</strong></div>
+            <div>투입된 루프 횟수: <strong id="victory-attempts" style="color: #ffb300;">1회</strong></div>
+            <div>달성 등급: <strong id="victory-stars-display" style="color: #fde047; font-size: 16px;">★★★</strong></div>
+          </div>
+          <p style="font-size: 11px; color: #8b949e;">[Space]를 누르거나 아래 버튼으로 다음 작전 구역으로 진입하십시오.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="btn-victory-next">다음 작전 구역 진행 (Space) →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

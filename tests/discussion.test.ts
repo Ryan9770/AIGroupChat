@@ -102,6 +102,71 @@ describe('구조화 모델 토론', () => {
     expect(prompts[10]).toContain('발언 10');
   });
 
+  it('마지막 한 바퀴에서 모든 역할에 구조화된 최종 입장을 요구한다', async () => {
+    const prompts: string[] = [];
+    await runDiscussion({
+      spec,
+      cwd: 'C:/repo',
+      speak: async ({ provider, prompt }) => {
+        prompts.push(prompt);
+        return provider === 'gemini' ? '최종 정리' : '짧은 발언';
+      },
+    });
+
+    expect(prompts[7]).not.toContain('최종 입장 라운드');
+    expect(prompts[8]).toContain('최종 입장 라운드 1/2');
+    expect(prompts[9]).toContain('[최종 선택]');
+    expect(prompts[9]).toContain('[남은 이견]');
+  });
+
+  it('UI 발언은 짧게 표시하지만 최종 서기에는 더 긴 원문을 전달한다', async () => {
+    const longSpeech = `원문-시작-${'가'.repeat(1_100)}-원문-끝`;
+    const displayed: string[] = [];
+    let summaryPrompt = '';
+    let turnCall = 0;
+
+    const result = await runDiscussion({
+      spec,
+      cwd: 'C:/repo',
+      onTurnEnd: (turn) => displayed.push(turn.text),
+      speak: async ({ provider, prompt }) => {
+        if (provider === 'gemini') {
+          summaryPrompt = prompt;
+          return '최종 정리';
+        }
+        turnCall += 1;
+        return turnCall === 1 ? longSpeech : '짧은 발언';
+      },
+    });
+
+    expect(result.turns[0]).toMatchObject({ truncated: true, originalChars: longSpeech.length });
+    expect(displayed[0]).toContain('화면 표시 길이 제한');
+    expect(displayed[0]).not.toContain('원문-끝');
+    expect(summaryPrompt).toContain('원문-끝');
+  });
+
+  it('긴 누적 요약의 후보 레지스트리와 최신 결정을 모두 보존한다', async () => {
+    const prompts: string[] = [];
+    let turnCall = 0;
+    await runDiscussion({
+      spec,
+      cwd: 'C:/repo',
+      speak: async ({ provider, prompt }) => {
+        prompts.push(prompt);
+        if (provider === 'gemini') return '최종 정리';
+        turnCall += 1;
+        if (turnCall === 1) {
+          return `<speech>첫 발언</speech><rolling-summary>[후보 레지스트리] 최초 후보\n${'중간'.repeat(900)}\n[합의·이견] 최신 결정</rolling-summary>`;
+        }
+        return '후속 발언';
+      },
+    });
+
+    expect(prompts[1]).toContain('[후보 레지스트리] 최초 후보');
+    expect(prompts[1]).toContain('[합의·이견] 최신 결정');
+    expect(prompts[1]).toContain('누적 요약 중간 생략');
+  });
+
   it('구조화 발언을 분리하고 provider별 실제 사용량을 누적한다', () => {
     expect(parseDiscussionContribution(
       '<speech>검토 의견</speech><rolling-summary>합의와 이견</rolling-summary>',
@@ -136,5 +201,23 @@ describe('구조화 모델 토론', () => {
     });
     expect(usage.byProvider.claude?.costUsd).toBe(0.012);
     expect(usage.byProvider.codex?.unpricedUsageEvents).toBe(1);
+  });
+
+  it('recovers a closed rolling summary when speech tags are missing', () => {
+    expect(parseDiscussionContribution(
+      'Final choice is candidate A.\n<rolling-summary>Candidate A leads</rolling-summary>',
+    )).toEqual({
+      speech: 'Final choice is candidate A.',
+      rollingSummary: 'Candidate A leads',
+    });
+  });
+
+  it('recovers an unclosed rolling summary without leaking it into speech', () => {
+    expect(parseDiscussionContribution(
+      '<speech>Final choice is candidate A.\n<rolling-summary>Candidate A leads',
+    )).toEqual({
+      speech: 'Final choice is candidate A.',
+      rollingSummary: 'Candidate A leads',
+    });
   });
 });

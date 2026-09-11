@@ -1,0 +1,308 @@
+{
+  "phase": "title",
+  "scene": "home",
+  "player": {
+    "x": 372,
+    "y": 300,
+    "facing": 1,
+    "walk": 0
+  },
+  "roots": 0,
+  "flowers": 0,
+  "herbs": 0,
+  "wood": 0,
+  "soup": 0,
+  "coins": 0,
+  "xp": 0,
+  "rootSeeds": 8,
+  "flowerSeeds": 0,
+  "rations": 0,
+  "ore": 0,
+  "relic": 0,
+  "crystal": 0,
+  "hp": 100,
+  "energy": 40,
+  "mealsEaten": 0,
+  "aidDay": 0,
+  "feedDay": 0,
+  "bonds": {
+    "slime": 0,
+    "mole": 0,
+    "moth": 0
+  },
+  "research": 0,
+  "selectedDepth": 1,
+  "journal": [
+    false,
+    false,
+    false
+  ],
+  "clears": [
+    0,
+    0,
+    0
+  ],
+  "contracts": 0,
+  "dungeon": null,
+  "evacuated": false,
+  "seed": "root",
+  "friends": {},
+  "bridge": false,
+  "gate": false,
+  "lit": false,
+  "restored": false,
+  "completed": false,
+  "elapsed": 0,
+  "day": 1,
+  "dayTime": 0,
+  "dayStats": {
+    "harvests": 0,
+    "foraged": 0,
+    "cooked": 0,
+    "income": 0,
+    "spent": 0,
+    "orders": 0
+  },
+  "upgrades": {
+    "garden": false,
+    "kitchen": false
+  },
+  "nodes": [
+    {
+      "id": "herb-a",
+      "kind": "herb",
+      "x": 8,
+      "y": 7,
+      "pickedDay": 0
+    },
+    {
+      "id": "herb-b",
+      "kind": "herb",
+      "x": 11,
+      "y": 12,
+      "pickedDay": 0
+    },
+    {
+      "id": "herb-c",
+      "kind": "herb",
+      "x": 17,
+      "y": 12,
+      "pickedDay": 0
+    },
+    {
+      "id": "herb-d",
+      "kind": "herb",
+      "x": 22,
+      "y": 4,
+      "pickedDay": 0
+    },
+    {
+      "id": "wood-a",
+      "kind": "wood",
+      "x": 3,
+      "y": 11,
+      "pickedDay": 0
+    },
+    {
+      "id": "wood-b",
+      "kind": "wood",
+      "x": 10,
+      "y": 5,
+      "pickedDay": 0
+    },
+    {
+      "id": "wood-c",
+      "kind": "wood",
+      "x": 11,
+      "y": 16,
+      "pickedDay": 0
+    },
+    {
+      "id": "wood-d",
+      "kind": "wood",
+      "x": 19,
+      "y": 14,
+      "pickedDay": 0
+    }
+  ],
+  "path": [],
+  "pending": null,
+  "harvests": 0,
+  "interactions": 0,
+  "plots": [
+    {
+      "x": 5,
+      "y": 10,
+      "crop": "root",
+      "growth": 1,
+      "plantedDay": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "crop": "root",
+      "growth": 1,
+      "plantedDay": 0
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "crop": null,
+      "growth": 0,
+      "plantedDay": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "crop": null,
+      "growth": 0,
+      "plantedDay": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "crop": null,
+      "growth": 0,
+      "plantedDay": 0
+    },
+    {
+      "x": 6,
+      "y": 12,
+      "crop": null,
+      "growth": 0,
+      "plantedDay": 0
+    },
+    {
+      "x": 7,
+      "y": 12,
+      "crop": null,
+      "growth": 0,
+      "plantedDay": 0
+    },
+    {
+      "x": 8,
+      "y": 12,
+      "crop": null,
+      "growth": 0,
+      "plantedDay": 0
+    }
+  ],
+  "objective": [
+    1,
+    "문을 열고 생활을 시작해요",
+    "집 아래쪽 문을 클릭해 농장으로 나가요. 익은 당근 두 칸과 씨앗 8개가 있어요. 씨앗·음식·도시락 중 어디에 쓸지 나눠 보세요."
+  ],
+  "saveVersion": 3,
+  "stations": {
+    "cottage": {
+      "kind": "cottage",
+      "x": 5,
+      "y": 7
+    },
+    "stove": {
+      "kind": "stove",
+      "x": 9,
+      "y": 6
+    },
+    "board": {
+      "kind": "board",
+      "x": 11,
+      "y": 14
+    },
+    "workbench": {
+      "kind": "workbench",
+      "x": 10,
+      "y": 12
+    },
+    "cave": {
+      "kind": "cave",
+      "x": 12,
+      "y": 4
+    },
+    "research": {
+      "kind": "research",
+      "x": 8,
+      "y": 16
+    }
+  },
+  "targets": [
+    {
+      "kind": "bed",
+      "x": 10,
+      "y": 6
+    },
+    {
+      "kind": "home-exit",
+      "x": 15,
+      "y": 14
+    },
+    {
+      "kind": "seed-aid",
+      "x": 20,
+      "y": 7
+    }
+  ],
+  "recipes": {
+    "soup": {
+      "roots": 2,
+      "herbs": 1,
+      "energy": 1
+    },
+    "ration": {
+      "roots": 2,
+      "energy": 1
+    },
+    "seeds": {
+      "roots": 1,
+      "energy": 1
+    },
+    "feed": {
+      "roots": 2,
+      "energy": 1
+    }
+  },
+  "researchCosts": [
+    {
+      "ore": 4,
+      "wood": 3,
+      "coins": 12
+    },
+    {
+      "relic": 2,
+      "flowers": 1,
+      "coins": 20
+    },
+    {
+      "crystal": 3,
+      "roots": 4,
+      "coins": 30
+    }
+  ],
+  "contractTable": [
+    {
+      "item": "ore",
+      "amount": 3,
+      "reward": 12,
+      "supply": "rootSeeds",
+      "count": 2
+    },
+    {
+      "item": "relic",
+      "amount": 1,
+      "reward": 18,
+      "supply": "herbs",
+      "count": 2
+    },
+    {
+      "item": "crystal",
+      "amount": 1,
+      "reward": 24,
+      "supply": "flowerSeeds",
+      "count": 1
+    }
+  ],
+  "maxEnergy": 40,
+  "maxDepth": 1,
+  "attackPower": 12,
+  "attackCooldown": 0
+}

@@ -471,6 +471,7 @@ export function buildServer(opts: ApiOptions): FastifyInstance {
               role: turn.role,
               text: turn.text,
               ...(turn.error ? { error: turn.error } : {}),
+              ...(turn.truncated ? { truncated: true, originalChars: turn.originalChars } : {}),
             }),
           onSummaryStart: (provider) => emit({ type: 'discussion.summary.start', provider }),
           onSummaryEnd: (provider, text) =>

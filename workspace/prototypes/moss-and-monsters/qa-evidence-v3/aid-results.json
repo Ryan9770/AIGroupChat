@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "earnedStateInjection": false,
+  "timeAcceleration": false,
+  "results": [
+    {
+      "name": "Emergency seed package rescues genuine crop and seed exhaustion without duplication",
+      "detail": "day 2",
+      "seconds": 28
+    },
+    {
+      "name": "Aid seeds restart the overnight farming loop",
+      "detail": "",
+      "seconds": 39
+    }
+  ],
+  "errors": []
+}

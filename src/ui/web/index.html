@@ -1451,7 +1451,7 @@ function renderDiscussionParticipants() {
       <div><label>${index + 1}번째 발언자</label><select data-discussion-index="${index}" data-discussion-key="provider">
         ${usable.map((provider) => `<option value="${esc(provider)}" ${provider === participant.provider ? 'selected' : ''}>${esc(provider)}</option>`).join('')}
       </select></div>
-      <div><label>관점/역할</label><input data-discussion-index="${index}" data-discussion-key="role" value="${esc(participant.role)}" placeholder="예: 보안과 운영 위험"></div>
+      <div><label>관점/역할</label><input maxlength="120" data-discussion-index="${index}" data-discussion-key="role" value="${esc(participant.role)}" placeholder="예: 보안과 운영 위험"></div>
       <div><label>모델 지정 (선택)</label><input data-discussion-index="${index}" data-discussion-key="model" value="${esc(participant.model || '')}" placeholder="provider 기본 모델"></div>
       <button class="ghost danger" data-discussion-remove="${index}">삭제</button>
     </div>`;
@@ -1491,9 +1491,14 @@ function syncDiscussionWarn() {
   if (discussionParticipants.length < 2) warnings.push('토론자는 두 명 이상 필요합니다.');
   if (!Number.isInteger(turns) || turns < 10 || turns > 20) warnings.push('전체 발언 턴은 10~20 사이의 정수여야 합니다.');
   if (discussionParticipants.some((participant) => !participant.role.trim())) warnings.push('모든 토론자의 관점/역할을 입력하세요.');
+  if (discussionParticipants.some((participant) => participant.role.trim().length > 120)) warnings.push('관점/역할은 참가자마다 120자 이하여야 합니다.');
+  const closingTurns = Math.min(turns, discussionParticipants.length);
+  const guidance = turns < discussionParticipants.length * 2
+    ? `<span class="bad">권장: ${discussionParticipants.length}개 역할에는 최소 ${discussionParticipants.length * 2}턴을 사용하세요. 마지막 ${closingTurns}턴은 최종 입장 라운드입니다.</span>`
+    : `지정한 순서로 발언하며 마지막 ${closingTurns}턴은 모든 역할의 최종 입장 라운드입니다. 이후 서기가 전체 기록을 종합합니다.`;
   $('discussionWarn').innerHTML = warnings.length
     ? `<span class="bad">⚠ ${warnings.map(esc).join(' ')}</span>`
-    : '토론자는 지정한 순서로 돌아가며 발언하고, 마지막에 서기가 전체 기록을 종합합니다.';
+    : guidance;
   $('discussionGo').disabled = warnings.length > 0 || !$('discussionScribe').value;
 }
 $('discussionTurns').onchange = syncDiscussionWarn;
@@ -1570,6 +1575,12 @@ $('discussionGo').onclick = async () => {
           entry.className = 'discussion-entry' + (event.error ? ' failed' : '');
           entry.querySelector('.discussion-text').textContent = event.error ? `발언 실패: ${event.error}` : event.text;
           entry.querySelector('.discussion-text').className = 'discussion-text' + (event.error ? ' bad' : '');
+          if (event.truncated) {
+            const note = document.createElement('div');
+            note.className = 'hint';
+            note.textContent = `화면에는 요약 표시 · 서기에는 ${Number(event.originalChars || 0).toLocaleString('ko-KR')}자 원문 전달`;
+            entry.appendChild(note);
+          }
         }
         if (event.type === 'discussion.summary.start') {
           $('discussionProgress').textContent = `서기 ${event.provider}가 최종 보고서를 작성 중…`;

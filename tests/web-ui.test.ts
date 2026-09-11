@@ -84,6 +84,10 @@ describe('웹 UI 페이지', () => {
     expect(script).toContain("event.type === 'usage'");
     expect(script).toContain('addDiscussionUsageEvent(event)');
     expect(script).toContain("event.type === 'discussion.turn.end'");
+    expect(script).toContain('event.truncated');
+    expect(script).toContain('서기에는');
+    expect(html).toContain('maxlength="120" data-discussion-index');
+    expect(script).toContain('마지막 ${closingTurns}턴은');
     expect(script).toContain("event.type === 'discussion.summary.end'");
   });
 });

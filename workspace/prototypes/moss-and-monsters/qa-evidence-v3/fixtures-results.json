@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "results": [
+    {
+      "name": "Real archived v2 save survives v3 startup and restart unchanged",
+      "detail": "",
+      "seconds": 1
+    },
+    {
+      "name": "Isolated invalid-save fallback: malformed-json",
+      "detail": "",
+      "seconds": 1
+    },
+    {
+      "name": "Isolated invalid-save fallback: negative-energy",
+      "detail": "",
+      "seconds": 1
+    },
+    {
+      "name": "Zero console and JavaScript errors in save fixture segment",
+      "detail": "",
+      "seconds": 1
+    }
+  ],
+  "errors": []
+}
