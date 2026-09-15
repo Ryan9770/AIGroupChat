@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { Script } from 'node:vm';
+import { Script, createContext, runInContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 const PAGE = 'src/ui/web/index.html';
@@ -64,9 +64,10 @@ describe('웹 UI 페이지', () => {
     expect(html).toContain('id="applyTeamPreset"');
     expect(html).not.toContain('id="presetClaudeLeads"');
     expect(script).toContain("const leader = $('teamLeader').value");
-    expect(script).toContain('design: withFallback(leader)');
-    expect(script).toContain('review: withFallback(leader)');
-    expect(script).toContain('implement: withFallback(worker)');
+    expect(script).toContain("applyTeamSelection(['design', 'review']");
+    expect(script).toContain("applyTeamSelection(['implement', 'custom']");
+    expect(html).toContain('id="teamFallback"');
+    expect(html).toContain('id="createTeamWorkflow"');
   });
 
   it('모델 토론 탭에서 토론자, 턴 수, 서기를 지정하고 실행한다', () => {
@@ -89,5 +90,101 @@ describe('웹 UI 페이지', () => {
     expect(html).toContain('maxlength="120" data-discussion-index');
     expect(script).toContain('마지막 ${closingTurns}턴은');
     expect(script).toContain("event.type === 'discussion.summary.end'");
+  });
+});
+
+// Execute the actual routing editor code: verify exported state, not just labels.
+function teamEditor() {
+  const html = readFileSync(PAGE, 'utf8');
+  const script = inlineScript(html);
+  const elements = new Map<string, any>();
+  const element = (id: string) => {
+    if (!elements.has(id)) {
+      let markup = '';
+      const el = {
+        value: '', checked: false, textContent: '',
+        focus() {}, querySelectorAll() { return []; },
+        get innerHTML() { return markup; },
+        set innerHTML(value: string) {
+          markup = value;
+          if (['teamLeader', 'teamWorker'].includes(id)) {
+            const options = [...value.matchAll(/<option value="([^"]*)"([^>]*)>/g)];
+            this.value = (options.find((m) => m[2]?.includes('selected')) || options[0])?.[1] || '';
+          }
+        },
+      };
+      elements.set(id, el);
+    }
+    return elements.get(id);
+  };
+  const context = createContext({
+    $: element, esc: (s: unknown) => String(s), alert() {}, confirm: () => true,
+    providers: ['claude', 'antigravity', 'codex'].map((provider) => ({ provider, installed: true, authed: true })),
+  });
+  runInContext(script.slice(script.indexOf('let tasks = [];'), script.indexOf('function syncPlanWarn()')), context);
+  runInContext(script.slice(script.indexOf('function loadPlanTemplate(tpl)'), script.indexOf('const currentPlan =')), context);
+  return {
+    element,
+    run: (code: string) => runInContext(code, context),
+    state: () => JSON.parse(runInContext('JSON.stringify({ routes, tasks })', context)),
+  };
+}
+
+describe('team routing editor behavior', () => {
+  it('initializes exactly the visible team, including general work, without hidden fallback', () => {
+    const ui = teamEditor();
+    ui.run('renderTeamPresetOptions()');
+    expect(ui.state().routes).toEqual({ design: ['codex'], review: ['codex'], implement: ['antigravity'], custom: ['antigravity'] });
+    expect(ui.element('teamLeader').value).toBe('codex');
+    ui.element('teamWorker').value = 'claude';
+    ui.element('teamWorker').onchange();
+    expect(ui.state().routes.custom).toEqual(['claude']);
+    ui.run('renderTeamPresetOptions()');
+    expect(ui.element('teamWorker').value).toBe('claude');
+  });
+
+  it('enables fallback explicitly and can return to selected-model-only routing', () => {
+    const ui = teamEditor();
+    ui.run('renderTeamPresetOptions()');
+    ui.element('teamFallback').checked = true;
+    ui.element('teamFallback').onchange();
+    expect(ui.state().routes.design).toEqual(['codex', 'claude', 'antigravity']);
+    ui.element('teamFallback').checked = false;
+    ui.element('teamFallback').onchange();
+    expect(ui.state().routes.design).toEqual(['codex']);
+  });
+
+  it('preserves imported exceptions, shows them, and does not inherit stale routes on import', () => {
+    const ui = teamEditor();
+    ui.run('renderTeamPresetOptions()');
+    ui.run(`loadPlanTemplate({ objective: 'test', routes: { design: ['claude'] }, tasks: [{ id: 'x', role: 'custom', providers: ['codex'], spec: 'test' }] })`);
+    expect(ui.element('teamLeader').value).toBe('');
+    expect(ui.run('assignmentLabel(tasks[0])')).toContain('작업별 직접 지정: codex');
+    ui.run(`loadPlanTemplate({ objective: 'second', tasks: [] })`);
+    expect(ui.state().routes).toEqual({});
+    ui.run('renderTeamPresetOptions()');
+    expect(ui.state().routes).toEqual({});
+  });
+
+  it('keeps an unavailable selection visible instead of silently replacing it', () => {
+    const ui = teamEditor();
+    ui.run('renderTeamPresetOptions(); providers = providers.filter(p => p.provider !== "codex"); renderTeamPresetOptions()');
+    expect(ui.state().routes.design).toEqual(['codex']);
+    expect(ui.element('teamLeader').innerHTML).toContain('codex (사용 불가)');
+  });
+
+  it('creates an explicit three-step workflow with dependencies and context', () => {
+    const ui = teamEditor();
+    ui.run('renderTeamPresetOptions()');
+    ui.element('planObjective').value = 'Build a puzzle';
+    ui.element('createTeamWorkflow').onclick();
+    const { tasks } = ui.state();
+    expect(tasks.map((t: any) => t.role)).toEqual(['design', 'implement', 'review']);
+    expect(tasks[1].dependsOn).toEqual(['design']);
+    expect(tasks[2].dependsOn).toEqual(['implement']);
+    expect(tasks[2].context).toEqual(['design', 'implement']);
+    expect(tasks.every((t: any) => t.spec.includes('Build a puzzle'))).toBe(true);
+    ui.element('addTask').onclick();
+    expect(ui.state().tasks[3].role).toBe('implement');
   });
 });

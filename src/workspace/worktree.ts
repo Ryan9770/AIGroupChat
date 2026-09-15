@@ -1,4 +1,5 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   currentBranch,
@@ -30,6 +31,14 @@ export interface WorkspaceChanges {
   files: string[];
   /** `git diff --stat` 요약. 전체 diff는 크므로 요약만 들고 온다. */
   stat: string;
+}
+
+/** Baseline used to report only edits made by a direct (non-worktree) dispatch. */
+export interface WorkingTreeSnapshot {
+  repoRoot: string;
+  head?: string;
+  /** Fingerprints only for paths that were already dirty when the dispatch began. */
+  fingerprints: Record<string, string>;
 }
 
 /**
@@ -149,6 +158,97 @@ export async function collectChanges(ws: Workspace): Promise<WorkspaceChanges> {
   const stat = await git(['-c', 'core.quotepath=false', 'diff', '--stat', 'HEAD'], ws.path);
 
   return { files, stat: stat.ok ? stat.stdout : '' };
+}
+
+const CLEAN_PATH = '<clean>';
+const MISSING_PATH = '<missing>';
+
+async function fingerprintFile(repoRoot: string, relativePath: string): Promise<string> {
+  try {
+    const content = await readFile(join(repoRoot, relativePath));
+    return createHash('sha256').update(content).digest('hex');
+  } catch {
+    return MISSING_PATH;
+  }
+}
+
+/**
+ * Capture pre-existing dirt before a task writes directly in the user's checkout.
+ *
+ * A plain post-run `git status` cannot distinguish the task's edits from the
+ * user's existing changes. Hashing just the paths that are already dirty keeps
+ * the baseline cheap while still detecting a task editing an already-modified or
+ * untracked file.
+ */
+export async function captureWorkingTreeSnapshot(
+  cwd: string,
+): Promise<WorkingTreeSnapshot | null> {
+  const repoRoot = await findRepoRoot(cwd);
+  if (!repoRoot) return null;
+
+  const status = await git(
+    ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'],
+    repoRoot,
+  );
+  if (!status.ok) return null;
+
+  const paths = [...new Set(parseStatusPaths(status.stdout))];
+  const fingerprints: Record<string, string> = {};
+  for (const path of paths) fingerprints[path] = await fingerprintFile(repoRoot, path);
+
+  const head = await git(['rev-parse', '--verify', 'HEAD'], repoRoot);
+  return {
+    repoRoot,
+    fingerprints,
+    ...(head.ok && head.stdout.trim() ? { head: head.stdout.trim() } : {}),
+  };
+}
+
+/** Return only files whose working content/state changed after the baseline. */
+export async function collectChangesSince(
+  snapshot: WorkingTreeSnapshot,
+): Promise<WorkspaceChanges> {
+  const status = await git(
+    ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'],
+    snapshot.repoRoot,
+  );
+  if (!status.ok) return { files: [], stat: '' };
+
+  const currentPaths = new Set(parseStatusPaths(status.stdout));
+  const candidates = new Set([...Object.keys(snapshot.fingerprints), ...currentPaths]);
+  const committedPaths = new Set<string>();
+
+  // A worker can legitimately commit its work. Include committed paths even when
+  // the checkout is clean at the end of the dispatch.
+  if (snapshot.head) {
+    const committed = await git(
+      ['-c', 'core.quotepath=false', 'diff', '--name-only', snapshot.head, 'HEAD'],
+      snapshot.repoRoot,
+    );
+    if (committed.ok) {
+      for (const path of committed.stdout.split('\n').map((item) => item.trim()).filter(Boolean)) {
+        candidates.add(path);
+        committedPaths.add(path);
+      }
+    }
+  }
+
+  const files: string[] = [];
+  for (const path of candidates) {
+    const existedBefore = Object.hasOwn(snapshot.fingerprints, path);
+    const before = existedBefore ? snapshot.fingerprints[path]! : CLEAN_PATH;
+    const after = currentPaths.has(path)
+      ? await fingerprintFile(snapshot.repoRoot, path)
+      : CLEAN_PATH;
+    if (before !== after || committedPaths.has(path)) {
+      files.push(path);
+    }
+  }
+
+  const stat = snapshot.head
+    ? await git(['-c', 'core.quotepath=false', 'diff', '--stat', snapshot.head], snapshot.repoRoot)
+    : undefined;
+  return { files: files.sort(), stat: stat?.ok ? stat.stdout : '' };
 }
 
 /** conductor가 만든 worktree 목록. 남의 worktree는 건드리지 않는다. */

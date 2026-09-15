@@ -89,6 +89,15 @@ export class AntigravityAdapter implements AgentAdapter {
   buildArgv(req: TaskRequest): Argv {
     const args = ['--output-format', 'stream-json'];
 
+    // agy has its own 5-minute print-mode timeout. Without overriding it, a
+    // healthy long implementation stops while a turn is still in progress even
+    // when Conductor grants a larger budget. Keep agy's guard just beyond the
+    // process manager's deadline so Conductor remains the source of truth.
+    if (req.timeoutMs && Number.isFinite(req.timeoutMs) && req.timeoutMs > 0) {
+      const seconds = Math.max(1, Math.ceil((req.timeoutMs + 30_000) / 1_000));
+      args.push('--print-timeout', `${seconds}s`);
+    }
+
     // ⚠️ agy의 `--mode plan`은 claude의 plan과 의미가 다르다.
     // claude: 읽기 전용 권한 제한. agy: **계획 수립 워크플로우**(태스크 관리·탐색 루프).
     // 같은 질문("package.json의 name")을 시킨 실측 비교:

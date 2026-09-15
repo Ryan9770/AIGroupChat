@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "assets": [
+    { "key": "image.tileset_0x72", "type": "image", "src": "assets/sprites/0x72_DungeonTilesetII_v1.7.png", "group": "boot" },
+    { "key": "image.kenney_char", "type": "image", "src": "assets/sprites/roguelikeChar_transparent.png", "group": "boot" },
+    { "key": "image.kenney_sheet", "type": "image", "src": "assets/sprites/roguelikeSheet_transparent.png", "group": "boot" },
+
+    { "key": "sfx.sword_swing", "type": "audio", "src": "assets/audio/knife_slice.ogg", "group": "boot" },
+    { "key": "sfx.sword_swing_2", "type": "audio", "src": "assets/audio/knife_slice_2.ogg", "group": "floor1" },
+    { "key": "sfx.sword_hit", "type": "audio", "src": "assets/audio/chop.ogg", "group": "boot" },
+    { "key": "sfx.shield_block", "type": "audio", "src": "assets/audio/metal_click.ogg", "group": "boot" },
+    { "key": "sfx.trap_trigger", "type": "audio", "src": "assets/audio/metal_latch.ogg", "group": "floor1" },
+    { "key": "sfx.gold_chime", "type": "audio", "src": "assets/audio/handle_coins.ogg", "group": "boot" },
+    { "key": "sfx.gold_chime_2", "type": "audio", "src": "assets/audio/handle_coins_2.ogg", "group": "hub" },
+    { "key": "sfx.chest_open", "type": "audio", "src": "assets/audio/creak_1.ogg", "group": "floor1" },
+    { "key": "sfx.chest_open_2", "type": "audio", "src": "assets/audio/creak_2.ogg", "group": "floor1" },
+    { "key": "sfx.door_open", "type": "audio", "src": "assets/audio/door_open_1.ogg", "group": "boot" },
+    { "key": "sfx.door_close", "type": "audio", "src": "assets/audio/door_close_1.ogg", "group": "boot" },
+    { "key": "sfx.footstep_0", "type": "audio", "src": "assets/audio/footstep_0.ogg", "group": "boot" },
+    { "key": "sfx.footstep_1", "type": "audio", "src": "assets/audio/footstep_1.ogg", "group": "floor1" },
+    { "key": "sfx.roll", "type": "audio", "src": "assets/audio/cloth_1.ogg", "group": "boot" },
+    { "key": "sfx.drop_leather", "type": "audio", "src": "assets/audio/drop_leather.ogg", "group": "hub" },
+    { "key": "sfx.golem_smash", "type": "audio", "src": "assets/audio/metal_pot_1.ogg", "group": "floor1" },
+    { "key": "sfx.golem_smash_2", "type": "audio", "src": "assets/audio/metal_pot_2.ogg", "group": "floor1" },
+    { "key": "sfx.card_open", "type": "audio", "src": "assets/audio/book_open.ogg", "group": "boot" },
+    { "key": "sfx.card_close", "type": "audio", "src": "assets/audio/book_close.ogg", "group": "hub" },
+
+    { "key": "amb.floor1_base", "type": "audio", "src": "assets/audio/dungeon_ambience.ogg", "group": "boot" }
+  ]
+}

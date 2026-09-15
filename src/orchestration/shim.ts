@@ -1,4 +1,4 @@
-import { access, chmod, writeFile } from 'node:fs/promises';
+import { access, chmod, copyFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -63,6 +63,18 @@ async function resolveEntry(): Promise<{ entry: string; needsTsx: boolean }> {
 export async function writeConductorShim(binDir: string): Promise<Shim> {
   const { entry, needsTsx } = await resolveEntry();
 
+  // Worker protocol commands must stay usable inside restricted provider shells.
+  // Re-entering the full TypeScript CLI makes tsx inspect OS/user temp state; that
+  // can throw ERR_SYSTEM_ERROR under Antigravity even though ordinary file tools
+  // work. Route `conductor worker ...` through a dependency-free Node script and
+  // keep the full CLI only for commands such as `conductor mode ...`.
+  const workerSource = join(here, 'worker-shim.cjs');
+  if (!(await exists(workerSource))) {
+    throw new Error(`worker protocol shim을 찾을 수 없습니다: ${workerSource}`);
+  }
+  const workerEntry = join(binDir, 'conductor-worker.cjs');
+  await copyFile(workerSource, workerEntry);
+
   const argv = [process.execPath];
   if (needsTsx) {
     const tsxCli = join(packageRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -78,12 +90,31 @@ export async function writeConductorShim(binDir: string): Promise<Shim> {
 
   const quotedCmd = argv.map((a) => `"${a}"`).join(' ');
 
+  const quotedWorker = `"${process.execPath}" "${workerEntry}"`;
+
   // Windows: cmd.exe가 이걸 찾는다. %*로 인자를 그대로 넘긴다.
-  await writeFile(join(binDir, `${SHIM_COMMAND}.cmd`), `@echo off\r\n${quotedCmd} %*\r\n`, 'utf8');
+  await writeFile(
+    join(binDir, `${SHIM_COMMAND}.cmd`),
+    [
+      '@echo off',
+      'if /I "%~1"=="worker" goto conductor_worker',
+      `${quotedCmd} %*`,
+      'exit /b %errorlevel%',
+      ':conductor_worker',
+      `${quotedWorker} %*`,
+      'exit /b %errorlevel%',
+      '',
+    ].join('\r\n'),
+    'utf8',
+  );
 
   // POSIX 셸(워커가 bash/sh를 쓰는 경우)용.
   const shPath = join(binDir, SHIM_COMMAND);
-  await writeFile(shPath, `#!/bin/sh\nexec ${quotedCmd} "$@"\n`, 'utf8');
+  await writeFile(
+    shPath,
+    `#!/bin/sh\nif [ "$1" = "worker" ]; then\n  exec ${quotedWorker} "$@"\nfi\nexec ${quotedCmd} "$@"\n`,
+    'utf8',
+  );
   await chmod(shPath, 0o755).catch(() => undefined);
 
   return { command: SHIM_COMMAND, binDir };

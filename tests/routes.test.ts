@@ -186,9 +186,11 @@ describe('협약과 명령 권한', () => {
 
   it('자동 승인을 켜면 막지 않는다', () => {
     const { args } = getAdapter('antigravity').buildArgv({
-      prompt: 'x', mode: 'write', cwd: '.', autoApprove: true,
+      prompt: 'x', mode: 'write', cwd: '.', autoApprove: true, timeoutMs: 15 * 60_000,
     });
     expect(args).toContain('--dangerously-skip-permissions');
+    expect(args).toContain('--print-timeout');
+    expect(args).toContain('930s');
   });
 
   it('provider별 명령 권한 방식이 정의돼 있다', () => {

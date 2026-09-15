@@ -33,7 +33,8 @@ export async function* runAgent(
   req: TaskRequest,
   opts: RunOptions = {},
 ): AsyncGenerator<AgentEvent> {
-  const { bin, args, env } = adapter.buildArgv(req);
+  const timeoutMs = opts.timeoutMs ?? req.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const { bin, args, env } = adapter.buildArgv({ ...req, timeoutMs });
   const ctx: ParseContext = {};
   const startedAt = Date.now();
 
@@ -52,7 +53,7 @@ export async function* runAgent(
     ...(viaStdin ? { input: req.prompt } : { stdin: 'ignore' as const }),
     // 스트리밍이 목적이므로 버퍼링하지 않는다.
     buffer: false,
-    timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    timeout: timeoutMs,
     ...(opts.signal ? { cancelSignal: opts.signal } : {}),
   });
 
@@ -127,7 +128,7 @@ export async function* runAgent(
   const message =
     spawnFailure ??
     (timedOut
-      ? `타임아웃 (${opts.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms)`
+      ? `타임아웃 (${timeoutMs}ms)`
       : stderr.trim() || `${bin} 이(가) 코드 ${exitCode}로 종료`);
 
   yield {

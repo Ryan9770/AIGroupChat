@@ -1,0 +1,17 @@
+{
+  "name": "dungeon-extraction-game",
+  "version": "1.0.0",
+  "description": "『강탈자들 (Revenant Run)』 PvE 코옵 회수형 다크 판타지 던전 크롤러",
+  "scripts": {
+    "dev": "npm --prefix game run dev",
+    "build": "npm --prefix game run build",
+    "preview": "npm --prefix game run preview",
+    "test": "npm --prefix game run test",
+    "lint": "npm --prefix game run lint"
+  },
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

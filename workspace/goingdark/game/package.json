@@ -1,0 +1,22 @@
+{
+  "name": "revenant-run",
+  "version": "1.0.0",
+  "description": "『강탈자들 (Revenant Run)』 PvE 코옵 회수형 다크 판타지 던전 크롤러 — 플레이어블 프로토타입",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build:palette": "node tools/palette-remap.mjs",
+    "build:atlas": "node tools/palette-remap.mjs && node tools/build-atlas.mjs",
+    "build": "node tools/palette-remap.mjs && node tools/build-atlas.mjs && vite build",
+    "preview": "vite preview --host",
+    "test": "node tools/test.mjs",
+    "lint": "node tools/lint.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "pngjs": "^7.0.0",
+    "vite": "^5.4.11"
+  }
+}

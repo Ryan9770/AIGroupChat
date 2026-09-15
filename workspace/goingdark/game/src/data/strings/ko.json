@@ -1,0 +1,92 @@
+{
+  "game": {
+    "title": "강탈자들",
+    "subtitle": "Revenant Run",
+    "tagline": "구멍 밖으로 나온 것만 세상의 물건이다."
+  },
+  "menu": {
+    "continue": "이어하기",
+    "new_game": "새 원정",
+    "practice": "연습 굴 (튜토리얼)",
+    "settings": "설정",
+    "credits": "크레딧 & 법적 고지",
+    "quit": "종료",
+    "pause": "일시 정지",
+    "resume": "원정 계속하기",
+    "abandon": "원정 포기 (전량 로스트)",
+    "back": "뒤로 가기",
+    "close": "닫기"
+  },
+  "settings": {
+    "title": "장부 및 감각 설정",
+    "master_vol": "마스터 볼륨",
+    "music_vol": "음악 볼륨",
+    "ambience_vol": "환경음 볼륨",
+    "sfx_vol": "효과음 볼륨",
+    "screen_shake": "화면 흔들림 (트라우마)",
+    "flash_reduction": "빛 깜빡임 감소 (광과민성 보호)",
+    "colorblind_mode": "색각 보조 모드",
+    "colorblind_none": "일반 (표준 팔레트)",
+    "colorblind_deut": "제2색맹 (Deuteranopia 보정)",
+    "colorblind_prot": "제1색맹 (Protanopia 보정)",
+    "language": "언어 (Language)",
+    "ui_scale": "UI 배율"
+  },
+  "receipt": {
+    "title": "강탈자의 결산 영수증",
+    "session_id": "원정 식별 번호",
+    "status_extract": "생환 탈출 성공",
+    "status_death": "심연 속 전사 (유산 소화됨)",
+    "total_loot_val": "회수 전리품 총액",
+    "customs_fee": "세관 공제금 (-{rate}%)",
+    "net_payout": "실지급 정산액",
+    "gaze_end": "최종 시선 수치",
+    "time_elapsed": "심연 체류 시간",
+    "confirm": "장부 확인 및 거점 복귀"
+  },
+  "hud": {
+    "hp": "생명력",
+    "stamina": "스태미나",
+    "gaze": "심연의 시선",
+    "time": "경과 시간",
+    "tide": "심연 조수",
+    "floor": "{floor}층 · {name}",
+    "inventory": "배낭 ({used}/{max})",
+    "gold": "가치 {gold}G",
+    "gate_open": "탈출 게이트 개방",
+    "gate_closed": "게이트 잠김 (18:00)",
+    "guide_controls": "WASD 이동 · 좌클릭 공격 · 우클릭 방어 · Space 구르기 · Tab 장부 · F 게이트 충전 · E 상호작용"
+  },
+  "inventory": {
+    "title": "강탈자의 장부 (약탈 배낭)",
+    "occupied": "{used}/{max} 슬롯 점유",
+    "overburden": "2칸 점유 (무게 추 ⚖)",
+    "empty": "가방이 비어 있습니다.",
+    "weight": "무게 추",
+    "value": "환전 가치",
+    "rarity_common": "일반 [홈 1개]",
+    "rarity_uncommon": "고급 [홈 2개]",
+    "rarity_rare": "희귀 [홈 3개]",
+    "rarity_epic": "에픽 [홈 4개]"
+  },
+  "tutorial": {
+    "title": "연습 굴 — 강탈자의 기본 수칙",
+    "skip": "튜토리얼 건너뛰기 [ESC]",
+    "step1_move": "1단계: WASD 키로 이동하여 발판 위로 이동하세요.",
+    "step2_attack": "2단계: 마우스 좌클릭으로 허수아비를 공격하세요.",
+    "step3_guard": "3단계: 마우스 우클릭을 길게 눌러 방어 태세를 취하세요.",
+    "step4_roll": "4단계: 이동 중 Space를 눌러 무적 구르기를 사용하세요.",
+    "step5_loot": "5단계: 상자 근처로 다가가 E 키로 전리품을 약탈하세요.",
+    "step6_gaze": "6단계: 보물을 들수록 '시선'이 차오릅니다. 빛의 제단(E)으로 시선을 씻어내세요.",
+    "step7_gate": "7단계: 게이트 위에서 F를 길게 눌러 8초간 탈출 충전을 완료하세요!",
+    "step8_exchange": "8단계: 브로카에게 전리품을 환전하고 첫 정산을 완료하세요.",
+    "complete": "기본 훈련 완료! 이제 살아있는 구멍으로 뛰어들 준비가 되었습니다."
+  },
+  "dialogue": {
+    "broca": "브로카 (세관원)",
+    "serena": "세레나 (등불지기)",
+    "tollen": "톨렌 (대장장이)",
+    "nell": "넬 (지도사)",
+    "audobert": "오도베르 (왕실 잔재)"
+  }
+}

@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Nightly run at 02:00 UTC for deep simulation & memory benchmark
+    - cron: '0 2 * * *'
+
+jobs:
+  verify:
+    name: Build, Test & Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: game/package.json
+
+      - name: Install dependencies
+        working-directory: ./game
+        run: npm ci
+
+      - name: Run ESLint & Syntax Validation
+        working-directory: ./game
+        run: npm run lint
+
+      - name: Verify Public Asset Licenses
+        working-directory: ./game
+        run: node tools/check-licenses.mjs
+
+      - name: Build Vertical Slice Artifacts
+        working-directory: ./game
+        run: npm run build
+
+      - name: Run Test Suite (10,000 Seeds & Simulation Invariants)
+        working-directory: ./game
+        run: npm test
+
+  nightly-deep-check:
+    name: Nightly 10,000 Simulation & Memory Stress
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+          cache-dependency-path: game/package.json
+
+      - name: Install dependencies
+        working-directory: ./game
+        run: npm ci
+
+      - name: Run Extended Performance Benchmark
+        working-directory: ./game
+        run: node test/p6_performance_and_benchmark.test.js

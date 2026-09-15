@@ -31,6 +31,9 @@ export interface Task {
 /** 워커의 주장(`worker_done`)이 아니라 오케스트레이터의 판정. ADR-9 */
 export type Settlement = 'released' | 'retained';
 
+/** How a successful protocol dispatch established completion. */
+export type CompletionSource = 'worker_done' | 'verified_exit';
+
 export type DispatchOutcome =
   | 'succeeded'
   | 'failed'
@@ -51,6 +54,8 @@ export interface Dispatch {
   settledAt?: string;
   settlement?: Settlement;
   outcome?: DispatchOutcome;
+  /** Explicit worker report, or a guarded recovery from provider exit + artifacts. */
+  completionSource?: CompletionSource;
   /** 판정 근거. 워커의 말이 아니라 git이 알려준 것. */
   filesChanged?: string[];
 }

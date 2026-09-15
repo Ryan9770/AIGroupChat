@@ -603,18 +603,28 @@ pre.diff {
     <!-- 역할 라우팅 카드 -->
     <div class="card">
       <h2>
-        <span>역할별 Provider 라우팅</span>
+        <span>누가 작업을 맡을까요?</span>
         <span class="hint" style="margin:0" id="routeConfig"></span>
       </h2>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="routeGrid"></div>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:14px">
-        <div><label>팀장 (설계 &amp; 검토)</label><select id="teamLeader"></select></div>
-        <div><label>수행 (구현 워커)</label><select id="teamWorker"></select></div>
+        <div><label>팀장 · 설계와 검토</label><select id="teamLeader"></select></div>
+        <div><label>구현 담당 · 코드 작성과 일반 작업</label><select id="teamWorker"></select></div>
       </div>
+      <p class="hint">선택하면 바로 적용됩니다. 일반 작업도 구현 담당에게 배정됩니다. 단계별 협업은 아래 ‘설계 → 구현 → 검토 만들기’를 사용하세요.</p>
+      <div id="teamAssignment" role="status" aria-live="polite"></div>
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer">고급 설정 · 역할별 예외와 자동 대체</summary>
+        <p class="hint">역할별로 다른 담당을 지정할 수 있습니다. ‘프로젝트 기본값’은 서버 설정을 따르므로 실행 미리보기에서 확인하세요.</p>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))" id="routeGrid"></div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:14px">
+          <input type="checkbox" id="teamFallback" style="width:auto"> 다른 모델로 자동 대체 허용
+        </label>
+        <p class="hint">기본은 지정 모델만 사용합니다. 자동 대체를 켜면 로그인된 다른 모델도 후보에 포함됩니다. 작업별 직접 지정은 별도로 유지됩니다.</p>
       <div class="row" style="margin-top:14px">
-        <button class="ghost" id="applyTeamPreset">👑 팀 프리셋 적용</button>
-        <button class="ghost" id="presetClear">기본값으로 초기화</button>
+        <button class="ghost" id="applyTeamPreset">모든 역할에 현재 팀 적용</button>
+        <button class="ghost" id="presetClear">프로젝트 기본값 사용</button>
       </div>
+      </details>
     </div>
 
     <!-- Task 정의 카드 -->
@@ -641,6 +651,7 @@ pre.diff {
       <div id="taskList"></div>
 
       <div class="row" style="margin-top:14px">
+        <button class="act" id="createTeamWorkflow">설계 → 구현 → 검토 만들기</button>
         <button class="ghost" id="addTask">+ Task 추가</button>
         <button class="ghost" id="loadSample">기본 예시 불러오기</button>
       </div>
@@ -1050,53 +1061,99 @@ $('runStop').onclick = () => {
 /* ── 멀티 에이전트 계획 (Plan) ──────────────────────────── */
 let tasks = [];
 let routes = {};
+let teamInitialized = false;
 
 const ROLES = ['design', 'implement', 'review', 'custom'];
+const ROLE_LABELS = { design: '설계', implement: '구현', review: '검토', custom: '일반 작업' };
+const usableTeamProviders = () => providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
+function teamCandidates(first) {
+  if (!first) return undefined;
+  return $('teamFallback').checked
+    ? [first, ...usableTeamProviders().filter((p) => p !== first)] : [first];
+}
+function assignmentLabel(task) {
+  const candidates = task.providers ?? routes[task.role || 'custom'];
+  if (!candidates) return '프로젝트 기본값 · 실행 미리보기에서 확인';
+  if (!candidates.length) return '후보 없음 · 실행 불가';
+  const usable = usableTeamProviders();
+  const description = candidates.map((p) => p + (usable.includes(p) ? '' : ' (사용 불가)')).join(' → ');
+  return (task.providers ? '작업별 직접 지정: ' : '') + description;
+}
+function refreshAssignments() {
+  $('teamAssignment').innerHTML = ROLES.map((role) =>
+    `<div><b>${ROLE_LABELS[role]}</b> · ${esc(assignmentLabel({ role }))}</div>`).join('');
+  $('taskList').querySelectorAll('[data-assignment]').forEach((el) => {
+    el.textContent = '담당: ' + assignmentLabel(tasks[+el.dataset.assignment]);
+  });
+  $('planPreviewOut').innerHTML = '';
+}
 function renderRoutes() {
-  const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
+  const usable = usableTeamProviders();
   $('routeGrid').innerHTML = ROLES.map((role) => `
-    <div><label>${role.toUpperCase()}</label><select data-role="${role}">
-      <option value="">기본 라우팅</option>
-      ${usable.map((p) => `<option value="${p}" ${routes[role]?.[0] === p ? 'selected' : ''}>${p}</option>`).join('')}
+    <div><label>${ROLE_LABELS[role]}</label><select data-role="${role}">
+      <option value="">프로젝트 기본값</option>
+      ${[...new Set([...usable, ...(routes[role] || [])])].map((p) => `<option value="${esc(p)}" ${routes[role]?.[0] === p ? 'selected' : ''}>${esc(p)}${usable.includes(p) ? '' : ' (사용 불가)'}</option>`).join('')}
     </select></div>`).join('');
 
   $('routeGrid').querySelectorAll('select').forEach((el) => {
     el.onchange = () => {
       const role = el.dataset.role;
       if (!el.value) delete routes[role];
-      else routes[role] = [el.value, ...usable.filter((p) => p !== el.value)];
+      else routes[role] = teamCandidates(el.value);
+      renderTeamPresetOptions();
+      refreshAssignments();
     };
   });
+  refreshAssignments();
 }
 
 function renderTeamPresetOptions() {
-  const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
-  if ($('teamLeader')) {
-    $('teamLeader').innerHTML = usable.map((p) => `<option value="${p}">${p}</option>`).join('');
-    if (usable.includes('codex')) $('teamLeader').value = 'codex';
-    else if (usable.includes('claude')) $('teamLeader').value = 'claude';
+  const usable = usableTeamProviders();
+  if (!teamInitialized && usable.length) {
+    teamInitialized = true;
+    if (!Object.keys(routes).length) {
+      const leader = usable.includes('codex') ? 'codex' : usable[0];
+      const worker = usable.includes('antigravity') ? 'antigravity' : usable[0];
+      routes = { design: [leader], review: [leader], implement: [worker], custom: [worker] };
+    }
   }
-  if ($('teamWorker')) {
-    $('teamWorker').innerHTML = usable.map((p) => `<option value="${p}">${p}</option>`).join('');
-    if (usable.includes('antigravity')) $('teamWorker').value = 'antigravity';
-    else if (usable.includes('claude')) $('teamWorker').value = 'claude';
+  for (const [id, roles] of [['teamLeader', ['design', 'review']], ['teamWorker', ['implement', 'custom']]]) {
+    const a = routes[roles[0]]?.[0], b = routes[roles[1]]?.[0];
+    const selected = a && a === b ? a : '';
+    const choices = [...new Set([...usable, ...(selected ? [selected] : [])])];
+    $(id).innerHTML = `<option value="">${a || b ? '역할별 설정 사용' : '프로젝트 기본값 사용'}</option>` + choices.map((p) =>
+      `<option value="${esc(p)}" ${selected === p ? 'selected' : ''}>${esc(p)}${usable.includes(p) ? '' : ' (사용 불가)'}</option>`).join('');
   }
+  $('teamFallback').checked = Object.values(routes).some((list) => list.length > 1);
+  renderRoutes();
 }
 
+function applyTeamSelection(roles, provider) {
+  for (const role of roles) {
+    if (provider) routes[role] = teamCandidates(provider);
+    else delete routes[role];
+  }
+  teamInitialized = true;
+  renderTeamPresetOptions();
+}
+$('teamLeader').onchange = () => applyTeamSelection(['design', 'review'], $('teamLeader').value);
+$('teamWorker').onchange = () => applyTeamSelection(['implement', 'custom'], $('teamWorker').value);
+$('teamFallback').onchange = () => {
+  for (const role of ROLES) if (routes[role]?.length) routes[role] = teamCandidates(routes[role][0]);
+  renderTeamPresetOptions();
+};
 $('applyTeamPreset').onclick = () => {
-  const usable = providers.filter((p) => p.installed && p.authed === true).map((p) => p.provider);
-  const withFallback = (first) => (usable.includes(first) ? [first, ...usable.filter((p) => p !== first)] : usable);
   const leader = $('teamLeader').value;
   const worker = $('teamWorker').value;
-  routes = {
-    design: withFallback(leader),
-    implement: withFallback(worker),
-    review: withFallback(leader),
-  };
-  renderRoutes();
+  if (!leader || !worker) { alert('팀장과 구현 담당을 먼저 선택하세요.'); return; }
+  if (tasks.some((t) => t.providers) && !confirm('작업별 직접 지정을 해제하고 현재 팀으로 통일할까요?')) return;
+  tasks.forEach((t) => { delete t.providers; });
+  routes = { design: teamCandidates(leader), review: teamCandidates(leader), implement: teamCandidates(worker), custom: teamCandidates(worker) };
+  renderTeamPresetOptions();
+  renderTasks();
 };
 
-$('presetClear').onclick = () => { routes = {}; renderRoutes(); };
+$('presetClear').onclick = () => { teamInitialized = true; routes = {}; renderTeamPresetOptions(); };
 
 function syncPlanWarn() {
   const blocked = providers
@@ -1166,10 +1223,9 @@ $('planPresetSelect').onchange = (e) => {
 function loadPlanTemplate(tpl) {
   $('planObjective').value = tpl.objective;
   tasks = JSON.parse(JSON.stringify(tpl.tasks));
-  if (tpl.routes) {
-    routes = JSON.parse(JSON.stringify(tpl.routes));
-    renderRoutes();
-  }
+  teamInitialized = true;
+  routes = JSON.parse(JSON.stringify(tpl.routes || {}));
+  renderTeamPresetOptions();
   renderTasks();
 }
 
@@ -1179,12 +1235,14 @@ function renderTasks() {
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
         <div><label>TASK ID</label><input data-i="${i}" data-k="id" value="${esc(t.id)}"></div>
         <div><label>역할 (ROLE)</label><select data-i="${i}" data-k="role">
-          ${['design','implement','review','custom'].map((r) => `<option ${t.role===r?'selected':''}>${r}</option>`).join('')}
+          ${ROLES.map((r) => `<option value="${r}" ${(t.role || 'custom')===r?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}
         </select></div>
         <div><label>선행 의존 (쉼표)</label><input data-i="${i}" data-k="dependsOn" value="${esc((t.dependsOn||[]).join(','))}"></div>
         <div><label>참고 문맥 (쉼표)</label><input data-i="${i}" data-k="context" value="${esc((t.context||[]).join(','))}"></div>
         <div style="align-self:end"><button class="ghost danger" data-del="${i}" style="width:100%">삭제</button></div>
       </div>
+      <div class="hint" data-assignment="${i}">${esc('담당: ' + assignmentLabel(t))}</div>
+      ${t.providers ? `<button class="ghost" data-team-assignment="${i}">작업별 직접 지정 해제 · 팀 설정 따르기</button>` : ''}
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:10px">
         <div><label>작업 공간 모드</label><input data-i="${i}" data-k="workspace" value="${esc(t.workspace||'none')}" placeholder="none | new | inherit:taskId"></div>
         <div><label>특정 모델 지정 (선택)</label><input data-i="${i}" data-k="codexModel" value="${esc(t.models?.codex||'')}" placeholder="예: gpt-5.4-mini"></div>
@@ -1201,15 +1259,33 @@ function renderTasks() {
       if (k === 'dependsOn' || k === 'context') t[k] = el.value.split(',').map((s) => s.trim()).filter(Boolean);
       else if (k === 'codexModel') { t.models = el.value.trim() ? { codex: el.value.trim() } : undefined; }
       else t[k] = el.value;
+      refreshAssignments();
     };
+  });
+  $('taskList').querySelectorAll('[data-team-assignment]').forEach((el) => {
+    el.onclick = () => { delete tasks[+el.dataset.teamAssignment].providers; renderTasks(); };
   });
   $('taskList').querySelectorAll('[data-del]').forEach((b) => {
     b.onclick = () => { tasks.splice(+b.dataset.del, 1); renderTasks(); };
   });
+  refreshAssignments();
 }
 
 $('addTask').onclick = () => {
-  tasks.push({ id: 'task' + (tasks.length + 1), role: 'custom', spec: '', dependsOn: [], context: [], workspace: 'none' });
+  let number = tasks.length + 1;
+  while (tasks.some((t) => t.id === 'task' + number)) number++;
+  tasks.push({ id: 'task' + number, role: 'implement', spec: '', dependsOn: [], context: [], workspace: 'none' });
+  renderTasks();
+};
+$('createTeamWorkflow').onclick = () => {
+  const objective = $('planObjective').value.trim();
+  if (!objective) { alert('전체 목표를 먼저 입력하세요.'); $('planObjective').focus(); return; }
+  if (tasks.length && !confirm('현재 작업 목록을 설계·구현·검토 3단계로 교체할까요?')) return;
+  tasks = [
+    { id: 'design', role: 'design', spec: `목표: ${objective}\n현재 프로젝트를 조사하고 구현 범위, 단계, 검증 기준을 설계하세요.`, dependsOn: [], context: [], workspace: 'none' },
+    { id: 'implement', role: 'implement', spec: `목표: ${objective}\n앞선 설계를 바탕으로 구현하고 필요한 테스트를 수행하세요.`, dependsOn: ['design'], context: ['design'], workspace: 'none' },
+    { id: 'review', role: 'review', spec: `목표: ${objective}\n설계와 구현 결과를 대조해 요구사항 충족 여부, 오류, 테스트 결과를 검토하세요.`, dependsOn: ['implement'], context: ['design', 'implement'], workspace: 'none' },
+  ];
   renderTasks();
 };
 $('loadSample').onclick = () => { loadPlanTemplate(PLAN_TEMPLATES['readme-sample']); };

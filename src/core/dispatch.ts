@@ -4,6 +4,7 @@ import { pathWithShim, writeConductorShim } from '../orchestration/shim.js';
 import type { AgentEvent } from '../protocol/events.js';
 import {
   ENV,
+  type CompletionSource,
   type Dispatch,
   type DispatchOutcome,
 } from '../protocol/orchestration.js';
@@ -18,6 +19,8 @@ import {
 import {
   checkBaseDrift,
   collectChanges,
+  collectChangesSince,
+  captureWorkingTreeSnapshot,
   createWorkspace,
   removeWorkspace,
   type Workspace,
@@ -75,6 +78,8 @@ export interface DispatchResult {
   taskId: string;
   status: 'success' | 'error' | 'cancelled';
   outcome: DispatchOutcome;
+  /** Present when protocol completion was explicit or safely recovered. */
+  completionSource?: CompletionSource;
   /** 워커의 worker_done 본문. 협약을 안 쓰면 마지막 응답 텍스트. */
   report: string;
   filesChanged: string[];
@@ -89,6 +94,56 @@ export interface DispatchResult {
    * 결과에 담아 넘기지 않으면 스케줄러가 "왜 실패했는지" 알 수 없다.
    */
   errors: Extract<AgentEvent, { kind: 'error' }>[];
+}
+
+export interface VerifiedExitEvidence {
+  provider: Provider;
+  mode: ExecutionMode;
+  status: DispatchResult['status'];
+  finalText: string;
+  filesChanged: string[];
+  errors: DispatchResult['errors'];
+}
+
+export interface VerifiedExitCompletion {
+  report: string;
+  note: string;
+}
+
+/**
+ * Recover Antigravity's missing handshake only when provider and artifact evidence
+ * agree that the turn completed. Antigravity can finish a long clean turn without
+ * executing the final shell command; blocking the review in that case discards
+ * the strongest independent evidence we have: a successful provider result and
+ * a measured working-tree delta.
+ */
+export function recoverVerifiedExit(
+  evidence: VerifiedExitEvidence,
+): VerifiedExitCompletion | undefined {
+  if (
+    evidence.provider !== 'antigravity' ||
+    evidence.status !== 'success' ||
+    evidence.errors.length > 0
+  ) {
+    return undefined;
+  }
+
+  const finalText = evidence.finalText.trim();
+  if (evidence.mode === 'write' && evidence.filesChanged.length === 0) return undefined;
+  if (evidence.mode === 'plan' && !finalText) return undefined;
+
+  const artifactSummary = `${evidence.filesChanged.length}개 파일 변경`;
+  return {
+    report:
+      finalText ||
+      `Antigravity가 정상 종료했고 Git에서 ${artifactSummary}을 확인했습니다. ` +
+        'worker done 보고는 누락되어 Conductor가 검증 가능한 실행 결과로 완료를 복구했습니다. ' +
+        '후속 리뷰에서 구현 내용과 테스트 결과를 검증해야 합니다.',
+    note:
+      `worker done 누락 자동 복구: Antigravity 정상 종료` +
+      (evidence.filesChanged.length > 0 ? ` + ${artifactSummary} 확인` : ' + 최종 응답 확인') +
+      '. 다음 리뷰를 계속합니다.',
+  };
 }
 
 /**
@@ -139,6 +194,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
   }
 
   const workerCwd = workspace?.path ?? request.cwd;
+  const directBaseline = workspace ? undefined : await captureWorkingTreeSnapshot(workerCwd);
 
   // 뒤처진 경우에만 알린다. 매번 띄우면 워커도 사람도 무시하게 된다.
   const drift = workspace && ownsWorkspace ? await checkBaseDrift(workspace) : undefined;
@@ -255,10 +311,15 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
 
   // ── 정산 ───────────────────────────────────────────────────────────────
   // 무엇이 바뀌었는지는 워커의 말이 아니라 git에게 묻는다.
-  const changes = workspace ? await collectChanges(workspace) : undefined;
+  const changes = workspace
+    ? await collectChanges(workspace)
+    : directBaseline
+      ? await collectChangesSince(directBaseline)
+      : undefined;
   const filesChanged = changes?.files ?? [];
 
   let outcome: DispatchOutcome;
+  let completionSource: CompletionSource | undefined;
   let note: string | undefined;
   let report = finalText;
 
@@ -267,12 +328,30 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
   } else if (request.protocol) {
     const completion = coordinator?.completion;
     if (!completion) {
-      // 프로세스가 0으로 끝났어도 완료 보고가 없으면 성공으로 치지 않는다. ADR-9
-      outcome = 'no_completion';
-      note = '워커가 worker done 없이 종료했습니다 — 완료로 인정하지 않습니다.';
-      status = 'error';
+      const recovered = recoverVerifiedExit({
+        provider: request.provider,
+        mode: request.mode,
+        status,
+        finalText,
+        filesChanged,
+        errors,
+      });
+      if (recovered) {
+        outcome = 'succeeded';
+        completionSource = 'verified_exit';
+        report = recovered.report;
+        note = recovered.note;
+      } else {
+        outcome = 'no_completion';
+        const executionError = errors.at(-1);
+        note = executionError
+          ? `워커 실행 오류(${executionError.code}) 뒤 worker done도 수신하지 못했습니다: ${executionError.message}`
+          : '워커가 worker done 없이 종료했습니다 — 완료로 인정하지 않습니다.';
+        status = 'error';
+      }
     } else {
       outcome = completion.outcome;
+      completionSource = 'worker_done';
       report = completion.body;
       if (completion.outcome === 'failed') {
         status = 'error';
@@ -295,6 +374,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
       settlement: outcome === 'succeeded' ? 'released' : 'retained',
       settledAt: new Date().toISOString(),
       filesChanged,
+      ...(completionSource ? { completionSource } : {}),
     });
   }
 
@@ -311,6 +391,7 @@ export async function executeDispatch(request: DispatchRequest): Promise<Dispatc
     taskId: request.taskId,
     status,
     outcome,
+    ...(completionSource ? { completionSource } : {}),
     report,
     filesChanged,
     errors,

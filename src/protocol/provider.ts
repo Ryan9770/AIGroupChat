@@ -18,6 +18,8 @@ export type ExecutionMode =
 export interface TaskRequest {
   /** 워커에게 줄 프롬프트 본문. */
   prompt: string;
+  /** Process budget propagated to providers that also enforce an internal timeout. */
+  timeoutMs?: number;
   /** 실행 모드. 어댑터가 벤더 플래그로 번역한다. */
   mode: ExecutionMode;
   /** 벤더 고유 모델 식별자. 미지정 시 각 CLI 기본값. */

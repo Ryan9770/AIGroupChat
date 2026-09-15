@@ -1,0 +1,92 @@
+{
+  "game": {
+    "title": "Revenant Run",
+    "subtitle": "Revenant Run",
+    "tagline": "Only what emerges from the hole belongs to the world."
+  },
+  "menu": {
+    "continue": "Continue",
+    "new_game": "New Expedition",
+    "practice": "Practice Den (Tutorial)",
+    "settings": "Settings",
+    "credits": "Credits & Legal Notices",
+    "quit": "Quit",
+    "pause": "Paused",
+    "resume": "Resume Expedition",
+    "abandon": "Abandon (Total Loss)",
+    "back": "Back",
+    "close": "Close"
+  },
+  "settings": {
+    "title": "Ledger & Sensory Settings",
+    "master_vol": "Master Volume",
+    "music_vol": "Music Volume",
+    "ambience_vol": "Ambience Volume",
+    "sfx_vol": "SFX Volume",
+    "screen_shake": "Screen Shake (Trauma)",
+    "flash_reduction": "Reduce Flashes (Photosensitivity)",
+    "colorblind_mode": "Colorblind Assist",
+    "colorblind_none": "None (Standard)",
+    "colorblind_deut": "Deuteranopia",
+    "colorblind_prot": "Protanopia",
+    "language": "Language",
+    "ui_scale": "UI Scale"
+  },
+  "receipt": {
+    "title": "Revenant's Expedition Receipt",
+    "session_id": "Expedition ID",
+    "status_extract": "Extracted Alive",
+    "status_death": "Digested in the Abyss",
+    "total_loot_val": "Gross Loot Value",
+    "customs_fee": "Customs Deduction (-{rate}%)",
+    "net_payout": "Net Payout",
+    "gaze_end": "Final Gaze Level",
+    "time_elapsed": "Time in Abyss",
+    "confirm": "Accept Ledger & Return"
+  },
+  "hud": {
+    "hp": "Life",
+    "stamina": "Stamina",
+    "gaze": "Gaze",
+    "time": "Time",
+    "tide": "Abyssal Tide",
+    "floor": "F{floor} · {name}",
+    "inventory": "Haul ({used}/{max})",
+    "gold": "Value {gold}G",
+    "gate_open": "Extraction Gate Open",
+    "gate_closed": "Gate Locked (18:00)",
+    "guide_controls": "WASD Move · L-Click Attack · R-Click Guard · Space Roll · Tab Ledger · F Charge Gate · E Interact"
+  },
+  "inventory": {
+    "title": "Revenant's Haul Ledger",
+    "occupied": "{used}/{max} Slots Occupied",
+    "overburden": "Takes 2 Slots (Weight ⚖)",
+    "empty": "Ledger is empty.",
+    "weight": "Weight",
+    "value": "Value",
+    "rarity_common": "Common [1 Notch]",
+    "rarity_uncommon": "Uncommon [2 Notches]",
+    "rarity_rare": "Rare [3 Notches]",
+    "rarity_epic": "Epic [4 Notches]"
+  },
+  "tutorial": {
+    "title": "Practice Den — Basic Drills",
+    "skip": "Skip Tutorial [ESC]",
+    "step1_move": "Step 1: Use WASD to move onto the marked platform.",
+    "step2_attack": "Step 2: Left-click to attack the target dummy.",
+    "step3_guard": "Step 3: Hold Right-click to raise your guard.",
+    "step4_roll": "Step 4: Press Space while moving to perform an invulnerable roll.",
+    "step5_loot": "Step 5: Approach the chest and press E to loot.",
+    "step6_gaze": "Step 6: Holding treasure increases Gaze. Cleanse it at the Altar of Light (E).",
+    "step7_gate": "Step 7: Stand on the gate and hold F to charge extraction for 8 seconds!",
+    "step8_exchange": "Step 8: Exchange your haul with Broca for your first payout.",
+    "complete": "Drill complete! You are ready to dive into the living pit."
+  },
+  "dialogue": {
+    "broca": "Broca (Customs Officer)",
+    "serena": "Serena (Lantern Bearer)",
+    "tollen": "Tollen (Blacksmith)",
+    "nell": "Nell (Cartographer)",
+    "audobert": "Audobert (Royal Residue)"
+  }
+}

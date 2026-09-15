@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -135,6 +135,15 @@ describe('worker CLI (실제 프로세스)', () => {
       stdin: 'ignore',
       timeout: 60_000,
     });
+
+  it('worker 명령을 전체 tsx CLI 대신 경량 shim으로 보낸다', async () => {
+    const cmd = await readFile(join(binDir, 'conductor.cmd'), 'utf8');
+    const workerShim = await readFile(join(binDir, 'conductor-worker.cjs'), 'utf8');
+    expect(cmd).toContain('goto conductor_worker');
+    expect(cmd).toContain('conductor-worker.cjs');
+    expect(workerShim).toContain("require('node:fs/promises')");
+    expect(workerShim).not.toContain('node_modules/tsx');
+  });
 
   it('worker done이 완료 보고를 기록한다', async () => {
     const result = await runShim(

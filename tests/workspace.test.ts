@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { parseStatusPaths, parseWorktreeList } from '../src/workspace/git.js';
-import { makeWorkspaceId, WORKSPACE_PREFIX } from '../src/workspace/worktree.js';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { git, parseStatusPaths, parseWorktreeList } from '../src/workspace/git.js';
+import {
+  captureWorkingTreeSnapshot,
+  collectChangesSince,
+  makeWorkspaceId,
+  WORKSPACE_PREFIX,
+} from '../src/workspace/worktree.js';
 
 describe('parseWorktreeList', () => {
   // `git worktree list --porcelain` 실제 형식.
@@ -76,5 +84,54 @@ describe('makeWorkspaceId', () => {
 
   it('특수문자를 제거한다', () => {
     expect(makeWorkspaceId('a/b\\c:d*e')).toMatch(/^a-b-c-d-e-/);
+  });
+});
+
+describe('direct working-tree change detection', () => {
+  const made: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(made.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  });
+
+  async function repo(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'conductor-direct-'));
+    made.push(dir);
+    expect((await git(['init'], dir)).ok).toBe(true);
+    await git(['config', 'user.email', 'tests@example.invalid'], dir);
+    await git(['config', 'user.name', 'Conductor Tests'], dir);
+    await writeFile(join(dir, 'tracked.txt'), 'base\n', 'utf8');
+    await git(['add', 'tracked.txt'], dir);
+    expect((await git(['commit', '-m', 'base'], dir)).ok).toBe(true);
+    return dir;
+  }
+
+  it('reports task edits but excludes unchanged pre-existing dirt', async () => {
+    const dir = await repo();
+    await writeFile(join(dir, 'tracked.txt'), 'user edit\n', 'utf8');
+    await writeFile(join(dir, 'untouched.txt'), 'pre-existing\n', 'utf8');
+    await writeFile(join(dir, 'edited-untracked.txt'), 'before\n', 'utf8');
+
+    const baseline = await captureWorkingTreeSnapshot(dir);
+    expect(baseline).not.toBeNull();
+
+    await writeFile(join(dir, 'tracked.txt'), 'worker edit\n', 'utf8');
+    await writeFile(join(dir, 'edited-untracked.txt'), 'after\n', 'utf8');
+    await writeFile(join(dir, 'created.txt'), 'new\n', 'utf8');
+
+    const changes = await collectChangesSince(baseline!);
+    expect(changes.files).toEqual(['created.txt', 'edited-untracked.txt', 'tracked.txt']);
+  });
+
+  it('reports a worker-created commit even when the checkout ends clean', async () => {
+    const dir = await repo();
+    const baseline = await captureWorkingTreeSnapshot(dir);
+    expect(baseline).not.toBeNull();
+
+    await writeFile(join(dir, 'tracked.txt'), 'committed by worker\n', 'utf8');
+    await git(['add', 'tracked.txt'], dir);
+    expect((await git(['commit', '-m', 'worker'], dir)).ok).toBe(true);
+
+    expect((await collectChangesSince(baseline!)).files).toEqual(['tracked.txt']);
   });
 });

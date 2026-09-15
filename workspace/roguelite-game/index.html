@@ -38,11 +38,22 @@
         </div>
         <div class="meta-item">
           <span class="meta-label">SOULS</span>
-          <span class="meta-value souls" id="hudSouls">0</span>
+          <span class="meta-value souls" id="hudSouls"><span class="soul-rune">𐌀</span> <span id="txtHudSouls">0</span></span>
         </div>
         <div class="meta-item">
           <span class="meta-label">GOLD</span>
           <span class="meta-value gold" id="hudGold">0</span>
+        </div>
+        <!-- Mourning Runes Seal (애도의 룬 5인장) -->
+        <div class="runes-seal" id="hudRunesSeal" title="애도의 다섯 룬 (NA · ETH · KA · RHA · EL)">
+          <div class="rune-seal-label">MOURNING RUNES</div>
+          <div class="rune-slots-wrapper">
+            <span class="rune-slot empty" data-rune-index="0" data-rune="NA" id="runeSlot0" title="[NA (기억과 이름)] B1F 장례 명부 비석">𐌀</span>
+            <span class="rune-slot empty" data-rune-index="1" data-rune="ETH" id="runeSlot1" title="[ETH (숨과 생명)] B2F 호흡의 비석">ᛖ</span>
+            <span class="rune-slot empty" data-rune-index="2" data-rune="KA" id="runeSlot2" title="[KA (맹세와 결속)] B3F 서약의 비석">ᚲ</span>
+            <span class="rune-slot empty" data-rune-index="3" data-rune="RHA" id="runeSlot3" title="[RHA (피와 대가)] B4F 피의 비석">ᚱ</span>
+            <span class="rune-slot empty" data-rune-index="4" data-rune="EL" id="runeSlot4" title="[EL (선택과 진명)] B5F 옥좌 제단">ᛇ</span>
+          </div>
         </div>
         <button class="btn btn--icon" id="btnSoundToggle" title="사운드 켜기/끄기">🔊</button>
         <button class="btn btn--icon" id="btnPrologue" title="심연의 전설 (Story)">📜</button>
@@ -203,6 +214,22 @@
         <div class="canvas-container" id="canvasContainer">
           <canvas id="gameCanvas" width="760" height="540"></canvas>
           <div class="canvas-overlay" id="canvasOverlay"></div>
+
+          <!-- Boss Health Bar with 3 Grail Cracks Phase Indicator -->
+          <div class="boss-hud-bar" id="bossHudBar" style="display: none;">
+            <div class="boss-hud__top">
+              <span class="boss-hud__name" id="bossHudName">심연의 군주 섀도우 드레이크</span>
+              <div class="boss-hud__cracks" id="bossGrailCracks">
+                <span class="grail-crack active" id="grailCrack1" title="1페이즈: 옥좌의 포식자">🏆 I</span>
+                <span class="grail-crack" id="grailCrack2" title="2페이즈: 황제의 현현">🏆 II</span>
+                <span class="grail-crack" id="grailCrack3" title="3페이즈: 공허 폭주 / 진명 각성">🏆 III</span>
+              </div>
+            </div>
+            <div class="boss-hud__track">
+              <div class="boss-hud__fill" id="bossHudFill" style="width: 100%;"></div>
+            </div>
+            <div class="boss-hud__status" id="bossHudStatus">HP 550 / 550</div>
+          </div>
 
           <!-- Floor Narration Cinematic Banner -->
           <div class="floor-banner" id="floorBanner">
@@ -427,11 +454,49 @@
     </div>
   </div>
 
+  <!-- 4.8. Ending Choice Screen Modal (Minimal Void & Runic Circle) -->
+  <div class="modal modal--full" id="modalEndingChoice" aria-hidden="true">
+    <div class="modal__backdrop"></div>
+    <div class="modal__dialog modal__dialog--ending-choice">
+      <div class="ending-rune-circle">
+        <span class="ending-center-rune">𐌀 · ᛖ · ᚲ · ᚱ · ᛇ</span>
+      </div>
+      <h2 class="ending-choice-title">선택의 옥좌 (THE THRONE OF CHOICE)</h2>
+      <p class="ending-choice-desc" id="endingChoiceDesc">
+        고대 수호룡의 가슴에서 황제의 검은 성배가 불길하게 박동합니다.<br>
+        천 년 동안 이어진 비극의 사슬을 당신은 어떻게 끝맺겠습니까?
+      </p>
+      <div class="ending-options-container">
+        <!-- Normal Ending Option -->
+        <div class="ending-option-card ending-option--destroy" id="btnChoiceDestroyHeart">
+          <div class="ending-option__tag danger">단죄와 불완전한 봉인</div>
+          <h3 class="ending-option__name">심장을 파괴한다 (DESTROY HEART)</h3>
+          <p class="ending-option__summary">
+            검은 성배와 수호룡의 심장을 일격에 부수어 심연의 팽창을 멈춥니다.<br>
+            당신 자신이 새 봉인의 파수꾼이 되어 비극의 고독한 순환을 짊어집니다.
+          </p>
+          <span class="ending-option__btn danger">노멀 엔딩: 《새로운 문지기》 ➔</span>
+        </div>
+        <!-- True Ending Option (Visible only if eligible) -->
+        <div class="ending-option-card ending-option--separate" id="btnChoiceSeparateEmperor" style="display: none;">
+          <div class="ending-option__tag cyan">진명 호명과 해방의 새벽</div>
+          <h3 class="ending-option__name">황제를 분리하고 이름을 부른다 (INVOKE TRUE NAME)</h3>
+          <p class="ending-option__summary">
+            다섯 애도의 룬(NA·ETH·KA·RHA·EL)을 울려 황제의 사념을 갈라내고,<br>
+            수호룡 녹티라크에게 천 년 만에 선택할 자유를 되돌려줍니다.
+          </p>
+          <span class="ending-option__btn cyan">진엔딩: 《이름을 돌려주는 새벽》 ➔</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 5. Victory Screen Modal -->
   <div class="modal modal--full" id="modalVictory" aria-hidden="true">
-    <div class="modal__dialog modal__dialog--victory">
-      <h2 class="victory-title">VICTORY</h2>
-      <p class="victory-subtitle">심연 5층의 절대 군주 '심연의 용 섀도우 드레이크'를 처치하고 지옥의 심연을 정복했습니다!</p>
+    <div class="modal__dialog modal__dialog--victory" id="victoryDialog">
+      <div class="victory-ending-badge" id="vicEndingBadge">노멀 엔딩: 새로운 문지기</div>
+      <h2 class="victory-title" id="vicTitle">VICTORY</h2>
+      <p class="victory-subtitle" id="vicSubtitle">심연 5층의 절대 군주 '심연의 용 섀도우 드레이크'를 처치하고 지옥의 심연을 정복했습니다!</p>
       
       <div class="death-stats">
         <div class="death-stat-box">
@@ -566,6 +631,46 @@
     </div>
   </div>
 
+  <!-- 7.5. Mourning Stele Interaction Modal (Ancient Parchment & Runic Frame) -->
+  <div class="modal" id="modalStele" aria-hidden="true">
+    <div class="modal__backdrop" data-close="modalStele"></div>
+    <div class="modal__dialog modal__dialog--stele">
+      <div class="modal__header">
+        <h3 class="modal__title rune-glow" id="steleModalTitle">🪨 애도의 비석 (MOURNING STELE)</h3>
+        <button class="modal__close" data-close="modalStele">✕</button>
+      </div>
+      <div class="modal__body stele-body">
+        <div class="stele-header-visual">
+          <div class="stele-rune-emblem" id="steleRuneEmblem">𐌀</div>
+          <h4 class="stele-name" id="steleName">장례 명부의 비석 (Mourning Stele of Names)</h4>
+          <span class="stele-subtitle" id="steleSubtitle">서사 퀘스트: 《지워진 자들의 행렬》</span>
+        </div>
+        <p class="stele-quote" id="steleQuote">“첫 번째 깊이, 이름을 삼킨 물의 묘지. 이곳에서 죽은 자는 잠들지 못한다. 불러 줄 이름을 잃었으므로.”</p>
+        <p class="stele-lore" id="steleLore">수도 함몰 당시 들이친 물에 장례 명부의 먹물이 풀리며 망자들은 이름을 잃었습니다.</p>
+        <div class="stele-hero-resonance" id="steleHeroResonance">
+          <!-- Populated with hero-specific resonance reflection -->
+        </div>
+        <div class="stele-choices-grid">
+          <div class="stele-card stele-card--restore" id="btnSteleRestore">
+            <div class="stele-card__badge">복원 △ RESTORE</div>
+            <h5 class="stele-card__title" id="steleRestoreTitle">이름을 새긴다</h5>
+            <p class="stele-card__desc" id="steleRestoreDesc">최대 HP 5% 공양, 룬 NA(기억) 복원. 진엔딩 서사 보존.</p>
+            <span class="stele-card__action">공명 및 복원하기 ➔</span>
+          </div>
+          <div class="stele-card stele-card--exploit" id="btnSteleExploit">
+            <div class="stele-card__badge danger">착취 ✕ EXPLOIT</div>
+            <h5 class="stele-card__title" id="steleExploitTitle">비석을 부순다</h5>
+            <p class="stele-card__desc" id="steleExploitDesc">즉시 영혼 35개 및 희귀 장비 획득. 진엔딩 영구 잠금!</p>
+            <span class="stele-card__action danger">파괴 및 힘 착취 ➔</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--primary" data-close="modalStele">비석을 지나치기 (닫기)</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 8. Bestiary & Relics Codex Modal -->
   <div class="modal modal--full" id="modalCodex" aria-hidden="true">
     <div class="modal__backdrop" data-close="modalCodex"></div>
@@ -580,6 +685,7 @@
           <button class="codex-tab" data-tab="relics">💎 유물 & 비보</button>
           <button class="codex-tab" data-tab="floors">🗺️ 5대 심연 층계</button>
           <button class="codex-tab" data-tab="chronicles">📜 심연의 연대기</button>
+          <button class="codex-tab" data-tab="endings">👑 윤회의 결말</button>
         </div>
         <div class="chronicles-subtabs" id="chroniclesSubtabs" style="display: none;">
           <button class="chronicle-filter active" data-cat="all">전체 (All)</button>
@@ -621,10 +727,26 @@
         <ul>
           <li><b>3개 클래스:</b> 전사(철벽 & 광역 분쇄), 도적(치명타 & 맹독 & 순간이동), 마법사(원거리 화염구 & 광역 빙결 & 치유).</li>
           <li><b>5개 심연 계층:</b> B1F 납골당 ➔ B2F 균류 동굴 ➔ B3F 해골 묘실(미니보스 데스나이트) ➔ B4F 용암 회랑 ➔ B5F 공허의 옥좌(최종 보스 드레이크).</li>
+          <li><b>애도의 다섯 룬:</b> 각 층의 애도의 비석을 복원(△)하거나 착취(✕)하여 운명의 결말(노멀 엔딩 vs 진엔딩)을 스스로 선택하십시오.</li>
           <li><b>상태 이상(Status Effects):</b> 화상(매 턴 불 피해), 중독(매 턴 독 피해), 빙결/기절(행동 불가), 보호막(피해 흡수).</li>
-          <li><b>함정 & 신비로운 제단:</b> 가시 함정, 독가스 분출구, 마력 룬과 함께 피의 제단, 생명의 샘, 영혼의 비석 등 위험과 보상이 공존하는 오브젝트가 던전에 배치됩니다.</li>
           <li><b>영구 메타 강화:</b> 사망하더라도 획득한 영혼 조각(Souls)은 성소에 보존되어 영구 스탯을 강화할 수 있습니다.</li>
         </ul>
+
+        <h4>⚙️ 접근성 및 시각 효과 설정 (ACCESSIBILITY)</h4>
+        <div class="settings-grid">
+          <label class="setting-item">
+            <input type="checkbox" id="chkScreenShake" checked>
+            <span>화면 흔들림 효과 (Screen Shake)</span>
+          </label>
+          <label class="setting-item">
+            <input type="checkbox" id="chkScreenFlash" checked>
+            <span>화면 플래시 효과 (Screen Flash)</span>
+          </label>
+          <label class="setting-item">
+            <input type="checkbox" id="chkReducedParticles">
+            <span>저사양 파티클 모드 (Reduced Particles 50%)</span>
+          </label>
+        </div>
       </div>
     </div>
   </div>
