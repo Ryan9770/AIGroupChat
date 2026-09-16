@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Sprite Forge — 캐릭터/적 스프라이트 미리보기</title>
+  <style>
+    body { background: #14121c; color: #e8e3d5; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; padding: 24px; }
+    h1 { font-size: 18px; }
+    p { color: #9a93a8; max-width: 640px; line-height: 1.6; }
+    .grid { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 20px; }
+    .cell { background: #1e1b28; border: 1px solid #2c2838; border-radius: 8px; padding: 12px; text-align: center; width: 120px; }
+    .cell canvas { image-rendering: pixelated; background:
+      repeating-conic-gradient(#26232f 0% 25%, #211e29 0% 50%) 50% / 16px 16px; }
+    .cell .name { margin-top: 8px; font-size: 12px; color: #cfc9dc; }
+    .cell .key { font-size: 10px; color: #6f6880; }
+  </style>
+</head>
+<body>
+  <h1>Sprite Forge — 절차적 캐릭터/적 스프라이트</h1>
+  <p>
+    외부 에셋 없이 <code>sprites.js</code>가 16×16 디자인 공간에서 사각형만으로
+    각 캐릭터·적을 그리고 1px 심연색 외곽선을 입혀 생성한 결과입니다.
+    게임 내에서는 이 캔버스가 캐시되어 던전 렌더링·도감에 사용됩니다.
+  </p>
+  <div class="grid" id="grid"></div>
+
+  <script src="sprites.js"></script>
+  <script>
+    const LABELS = {
+      warrior: '기사(플레이어)', rogue: '암살자(플레이어)', mage: '현자(플레이어)',
+      slime: '녹색 슬라임', spore: '포자 분출체', bat: '심연의 박쥐', rat: '역병 쥐',
+      goblin: '고블린 독궁수', spider: '동굴 맹독거미', skeleton: '스켈레톤 가디언',
+      necromancer: '사령술사', death_knight: '데스 나이트', imp: '지옥불 임프',
+      hound: '헬하운드', golem: '마그마 골렘', void_hatchling: '공허의 해츨링',
+      boss: '섀도우 드레이크', shop_guard: '분노한 상인 그리드', merchant: '방랑 상인',
+      mimic: '식인 미믹',
+    };
+    const grid = document.getElementById('grid');
+    for (const key of SpriteForge.keys) {
+      const src = SpriteForge.get(key, key === 'boss' ? 48 : 32);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const view = document.createElement('canvas');
+      view.width = 96; view.height = 96;
+      const g = view.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      if (src) g.drawImage(src, 0, 0, 96, 96);
+      cell.appendChild(view);
+      cell.insertAdjacentHTML('beforeend',
+        `<div class="name">${LABELS[key] || key}</div><div class="key">${key}</div>`);
+      grid.appendChild(cell);
+    }
+  </script>
+</body>
+</html>
